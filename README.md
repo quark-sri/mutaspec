@@ -26,4 +26,4 @@ Status: design. See [docs/PLAN.md](docs/PLAN.md) and [intent/](intent/).
 - Bugs come from two sources: rule-based changes (`<` to `<=`, `&&` to `||`, removed call…) and realistic bugs written by an agent from the code and its spec.
 - Agent-agnostic: a CLI plus files, with skills and plugins for Claude Code and other coding agents.
 
-Licence: Apache-2.0 (proposed; `LICENSE` file to be added).
+Licence: [Apache-2.0](LICENSE).
