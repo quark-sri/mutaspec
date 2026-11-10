@@ -47,8 +47,8 @@ Key decisions:
 
 | Milestone | Intents | Result |
 |---|---|---|
-| **v0.1 walking skeleton** | 0001, 0002, 0003 (rules, Python only), 0004 (sequential) | A real score for the example project's unit + API Suites. |
-| **v0.2 the improvement loop** | 0003 (Agent Mutants), 0006, 0007, 0008 | Suggestions, Rounds, compare, Claude Code skill + plugin. |
+| **v0.1 walking skeleton** | 0001, 0002, 0003 (rules, Java only), 0004 (sequential) | A real score for the example Spring Boot project's unit + API Suites. |
+| **v0.2 the improvement loop** | 0003 (Agent Mutants, Python rules), 0006, 0007, 0008 | Suggestions, Rounds, compare, Claude Code skill + plugin. |
 | **v0.3 scale and teams** | 0005, 0009, 0010, more languages, parallel worktrees, UI Suite example | Diff-scoped runs, CI gate, self-evaluation benchmark. |
 
 ## Risks
