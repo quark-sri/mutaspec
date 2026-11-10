@@ -20,7 +20,7 @@ Status: pre-draft. Intent: [intent.md](intent.md)
 - Generated code (e.g. `*_pb2.py`): excluded by default patterns.
 
 ## Functional requirements
-- **FR1** Operators (selective mutation): relational, arithmetic, logical connector, negation, boolean/constant, removed call, return value. Python via tree-sitter first.
+- **FR1** Operators (selective mutation): relational, arithmetic, logical connector, negation, boolean/constant, removed call, return value. Java via tree-sitter first.
 - **FR2** Mutant id = short hash of the normalized patch.
 - **FR3** `mutants.json` entry: id, file, line, origin `rule|agent`, operator or category, description, `spec_ref`, `why_realistic` (agent only).
 - **FR4** Limits: `--max`, per-file cap, one Mutant per line by default; seeded sampling.

@@ -20,4 +20,4 @@ Users get a fixed, reviewable set of bugs for their project, each stored as a sm
 
 ## Open questions
 - Use universalmutator for languages we do not support yet? Its licence is not detected on GitHub; needs a person to confirm it is permissive.
-- Which languages after Python? Proposed: TypeScript, then Java.
+- Which languages after Java? Proposed: Python, then TypeScript.

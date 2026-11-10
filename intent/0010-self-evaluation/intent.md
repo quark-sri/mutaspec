@@ -10,10 +10,10 @@ A small set of example projects with known test gaps, and a check that runs muta
 
 ## Affected users and systems
 - mutaspec maintainers and contributors.
-- `examples/` projects (Python API, TypeScript web app with UI tests, Java or Go service); `evals/`.
+- `examples/` projects (Java Spring Boot API, Python API, TypeScript web app with UI tests); `evals/`.
 
 ## Constraints
 - Paid agent checks only on demand and before releases.
 
 ## Open questions
-- Which third example language: Java or Go? Proposed: Java.
+- None.
