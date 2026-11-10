@@ -51,6 +51,8 @@ Key decisions:
 | **v0.2 the improvement loop** | 0003 (Agent Mutants, Python rules), 0006, 0007, 0008 | Suggestions, Rounds, compare, Claude Code skill + plugin. |
 | **v0.3 scale and teams** | 0005, 0009, 0010, more languages, parallel worktrees, UI Suite example | Diff-scoped runs, CI gate, self-evaluation benchmark. |
 
+Java and Spring Boot come first because they are the main stack of the owner and of the first users, so the first real score comes from a realistic project. Then Python, then TypeScript.
+
 ## Risks
 
 - **Run time.** API and UI Suites per Mutant are slow. Mitigate: few, good Mutants (Agent Mutants, arid filter, diff scope), cheapest Suite first, stop at first kill in `fast` mode, parallel worktrees.
