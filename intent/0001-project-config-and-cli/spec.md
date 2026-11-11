@@ -35,7 +35,7 @@ Status: approved. Intent: [intent.md](intent.md)
 - **FR2** Config fields: `[project] baseline, source, exclude, tests, spec, build`; `[[suites]] name, level, run, setup, start, ready, ready_timeout, teardown, timeout, junit, repeat, parallel`. Durations are strings like `"120s"`, `"5m"`.
 - **FR3** Placeholders `{port}` and `{worktree}` are allowed in Suite commands. mutaspec picks a free port per Suite.
 - **FR4** Exit codes: 0 ok, 1 quality result below threshold, 2 usage or config error, 3 environment or setup error.
-- **FR5** Config lives only in `mutaspec.toml` at the repo root; never in `pom.xml`, `pyproject.toml`, `package.json` or similar.
+- **FR5** Config lives only in `mutaspec.toml` in the project root: the directory where mutaspec runs, which must be inside a git repository. `.mutaspec/` sits next to it. Never in `pom.xml`, `pyproject.toml`, `package.json` or similar.
 - **FR6** Source/test split is per file: a file matched by `tests` is never a source file. Overlap is an error (AC7).
 - **FR7** `init` proposes `spec` globs from common places: OpenAPI/Swagger files (`openapi.*`, `swagger.*`, `**/openapi/*`) and `docs/` (0003 FR6).
 - **FR8** `init` writes `.mutaspec/.gitignore`; it never edits the user's own `.gitignore`.
