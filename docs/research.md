@@ -9,7 +9,7 @@
 | mutmut | Python | AST | pytest | Unit only |
 | cargo-mutants | Rust | AST | cargo test | Unit only |
 | Mull | C/C++ | LLVM IR | Compiled tests; git-diff mode | Diff-scoping idea |
-| [universalmutator](https://github.com/agroce/universalmutator) | Many (regex rules, optional comby) | Text rewrite of lines; TCE dedup | Any shell command | Possible Rule Mutant source |
+| [universalmutator](https://github.com/agroce/universalmutator) | Many (regex rules, optional comby) | Text rewrite of lines; TCE dedup | Any shell command | Possible Rule Mutant source for languages we do not support yet (v0.3+). Licence: LICENSE file is Apache-2.0, `setup.py` says MIT; owner accepted it as Apache-2.0 on 2026-11-10 |
 | [Mutahunter](https://scribe.disroot.org/post/493360) | Any (tree-sitter + LLM) | LLM | Any command | Agent Mutant idea; no Levels, no Rounds |
 | [LLMorpheus](https://github.com/githubnext/llmorpheus) | JS/TS | LLM fills placeholders | npm test | Archived; moved to neu-se |
 | [MAEWU](https://people.ece.ubc.ca/amesbah/resources/papers/icsme21.pdf) | Web UI | DOM changes in browser | E2E tests | UI-level idea; research prototype |

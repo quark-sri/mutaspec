@@ -1,6 +1,6 @@
 # Intent: bug injection
 
-Author: Srinivas. Status: draft. Part of [0000 mutaspec](../0000-mutaspec/intent.md).
+Author: Srinivas. Status: approved. Part of [0000 mutaspec](../0000-mutaspec/intent.md).
 
 ## Problem
 A test-quality score is only as good as the bugs used to measure it. Mechanical bugs (`<` to `<=`) are cheap and repeatable, but many are trivial or change nothing. The bugs teams really ship (a missing validation, a wrong status code, an off-by-one in paging, a swallowed error) are the ones integration, API and UI tests should catch, and no open tool plants them for any language. If the set of bugs changes between runs, scores cannot be compared.
@@ -19,5 +19,4 @@ Users get a fixed, reviewable set of bugs for their project, each stored as a sm
 - Same input gives the same mechanical bugs.
 
 ## Open questions
-- Use universalmutator for languages we do not support yet? Its licence is not detected on GitHub; needs a person to confirm it is permissive.
-- Which languages after Java? Proposed: Python, then TypeScript.
+- None. universalmutator may be used for languages we do not support yet: its LICENSE file is Apache-2.0 (docs/research.md). Languages after Java: Python, then TypeScript (docs/PLAN.md).

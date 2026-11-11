@@ -25,6 +25,7 @@ Status: pre-draft. Intent: [intent.md](intent.md)
 - **FR3** `mutants.json` entry: id, file, line, origin `rule|agent`, operator or category, description, `spec_ref`, `why_realistic` (agent only).
 - **FR4** Limits: `--max`, per-file cap, one Mutant per line by default; seeded sampling.
 - **FR5** Agent Mutant categories: validation, boundary, error handling, wrong value/status, state/ordering, auth/permission, UI text/visibility, other.
+- **FR6** Requirement documents (docs, API contracts such as OpenAPI, UI stories) are listed as globs in `[project] spec` in `mutaspec.toml`. `mutaspec init` proposes entries from common places (OpenAPI files, `docs/`); see 0001. An Agent Mutant's `spec_ref` points into one of these files.
 
 ## Key entities
 Mutant, Mutant Set, Rule Mutant, Agent Mutant, Operator, Arid code.
@@ -37,4 +38,4 @@ Mutant, Mutant Set, Rule Mutant, Agent Mutant, Operator, Arid code.
 Multi-bug Mutants; changing the DOM at runtime for UI tests.
 
 ## Needs clarification
-- [NEEDS CLARIFICATION: where requirements live; proposed `spec = [...]` globs in config]
+- None.
