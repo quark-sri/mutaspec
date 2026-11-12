@@ -25,7 +25,7 @@ Status: approved.
 - `intent/README.md` — status `done` for 0001 at the end.
 
 ## Order of work (one commit each; test first, checks pass before each commit)
-1. [ ] Skeleton: `pyproject.toml`, package, `cli.py` with both commands stubbed, `errors.py`, `gitrepo.py`, JSON/text output. Tests: AC10, AC12 (error path). 
+1. [x] Skeleton: `pyproject.toml`, package, `cli.py` with both commands stubbed, `errors.py`, `gitrepo.py`, JSON/text output. Tests: AC10, AC12 (error path). 
 2. [ ] Config load and validation. Tests: AC8, AC9, AC11, edge "unknown key", durations, duplicate names.
 3. [ ] Source/test overlap with `exclude` applied. Test: AC7 (FR6).
 4. [ ] `examples/shop` fixture. Check by hand: `mvn -q verify` (unit) and the api flow (package, start, ready, `mvn test -Dgroups=api -DbaseUrl=…`) pass. Not part of pytest (pytest needs no Java).
