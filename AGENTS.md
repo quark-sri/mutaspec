@@ -4,7 +4,7 @@ Plants bugs in a git worktree, runs the project's own test suites against the cl
 
 ## Commands
 - Checks before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`
-- Demo / golden fixture (from v0.1): `uv run mutaspec run` in `examples/shop`; review the report diff on any output change.
+- Demo / golden fixture: in `examples/shop`, `uv run mutaspec init --force && uv run mutaspec config check`; `git status` must stay clean (the committed `mutaspec.toml` is the golden output). From v0.1: `uv run mutaspec run`; review the report diff on any output change.
 
 ## Conventions
 - Work follows [docs/process.md](docs/process.md): `intent.md` → `spec.md` → `plan.md` → tests → code, in `intent/NNNN-name/`. Do not write code for a feature whose spec.md is not `approved`.
