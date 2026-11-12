@@ -53,8 +53,7 @@ def test_ac8_unknown_level_names_suite_and_field(git_repo, run_cli):
     result = run_cli(git_repo, "config", "check")
 
     assert result.code == 2
-    assert "api" in result.err
-    assert "level" in result.err
+    assert "Suite 'api', field 'level'" in result.err
     assert "e2e" in result.err
 
 
@@ -200,3 +199,38 @@ def test_source_and_test_files_are_split_per_file(git_repo):
 
     assert source_files(config) == ["src/main/java/shop/Price.java"]
     assert cfg.test_files(config) == ["src/test/java/shop/PriceTest.java"]
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ('run = "mvn -q test"\n', ""),  # missing field
+        ('run = "mvn -q test"', 'run = ""'),  # empty string
+        ('run = "mvn -q test"', "run = 3"),  # wrong type
+        ('source = ["src/main/java/**"]', "source = 3"),  # globs wrong type
+        ('timeout = "5m"', "repeat = 0"),
+        ('timeout = "5m"', 'parallel = "yes"'),
+        ('timeout = "5m"', 'timeout = "five"'),
+        ("[project]", "[project"),  # not TOML
+    ],
+)
+def test_fr9_every_config_error_says_what_to_do_next(git_repo, run_cli, old, new):
+    write(git_repo, "mutaspec.toml", VALID.replace(old, new, 1))
+
+    result = run_cli(git_repo, "config", "check", "--json")
+
+    assert result.code == 2
+    error = result.json()["error"]
+    assert error["where"]
+    assert error["hint"]
+
+
+@pytest.mark.parametrize("key", ["timeout", "ready_timeout"])
+def test_edge_zero_duration_is_rejected(git_repo, run_cli, key):
+    text = VALID.replace('timeout = "5m"', f'{key} = "0s"')
+    write(git_repo, "mutaspec.toml", text)
+
+    result = run_cli(git_repo, "config", "check")
+
+    assert result.code == 2
+    assert key in result.err

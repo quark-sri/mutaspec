@@ -59,7 +59,10 @@ def parse_duration(value: Any, where: str) -> float:
     if not match:
         raise _error(where, f"{value!r} is not a duration.", 'Write it like "120s" or "5m".')
     number, unit = match.groups()
-    return float(number) * _UNIT_SECONDS[unit]
+    seconds = float(number) * _UNIT_SECONDS[unit]
+    if seconds <= 0:
+        raise _error(where, "must be more than 0.", 'Write it like "120s" or "5m".')
+    return seconds
 
 
 def _check_keys(table: dict, allowed: set[str], where: str) -> None:
@@ -72,14 +75,18 @@ def _check_keys(table: dict, allowed: set[str], where: str) -> None:
         )
 
 
+_STR_HINT = 'Write it in quotes, for example run = "mvn -q test".'
+_GLOBS_HINT = 'Write a list of globs, for example ["src/main/java/**"].'
+
+
 def _str(table: dict, key: str, where: str, required: bool = False) -> str | None:
     value = table.get(key)
     if value is None:
         if required:
-            raise _error(f"{where}, field '{key}'", "is missing.")
+            raise _error(f"{where}, field '{key}'", "is missing.", _STR_HINT)
         return None
     if not isinstance(value, str) or not value.strip():
-        raise _error(f"{where}, field '{key}'", "must be a non-empty string.")
+        raise _error(f"{where}, field '{key}'", "must be a non-empty string.", _STR_HINT)
     return value
 
 
@@ -87,10 +94,10 @@ def _globs(table: dict, key: str, where: str, required: bool = False) -> tuple[s
     value = table.get(key)
     if value is None:
         if required:
-            raise _error(f"{where}, field '{key}'", "is missing.", 'Example: ["src/main/java/**"].')
+            raise _error(f"{where}, field '{key}'", "is missing.", _GLOBS_HINT)
         return ()
     if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
-        raise _error(f"{where}, field '{key}'", "must be a list of glob strings.")
+        raise _error(f"{where}, field '{key}'", "must be a list of glob strings.", _GLOBS_HINT)
     return tuple(value)
 
 
@@ -111,7 +118,7 @@ def _project(table: Any) -> Project:
 
 def _suite(table: Any, index: int) -> Suite:
     if not isinstance(table, dict):
-        raise _error(f"[[suites]] #{index + 1}", "must be a table.")
+        raise _error(f"[[suites]] #{index + 1}", "must be a table.", "Start it with [[suites]].")
     name = table.get("name")
     where = f"Suite '{name}'" if isinstance(name, str) and name else f"[[suites]] #{index + 1}"
     _check_keys(table, {f.name for f in fields(Suite)}, where)
@@ -127,10 +134,16 @@ def _suite(table: Any, index: int) -> Suite:
 
     repeat = table.get("repeat", 1)
     if not isinstance(repeat, int) or isinstance(repeat, bool) or repeat < 1:
-        raise _error(f"{where}, field 'repeat'", "must be a whole number of 1 or more.")
+        raise _error(
+            f"{where}, field 'repeat'",
+            "must be a whole number of 1 or more.",
+            "Example: repeat = 2.",
+        )
     parallel = table.get("parallel", False)
     if not isinstance(parallel, bool):
-        raise _error(f"{where}, field 'parallel'", "must be true or false.")
+        raise _error(
+            f"{where}, field 'parallel'", "must be true or false.", "Write it without quotes."
+        )
 
     def duration(key: str) -> float | None:
         if key not in table:
@@ -144,7 +157,7 @@ def _suite(table: Any, index: int) -> Suite:
         setup=_str(table, "setup", where),
         start=_str(table, "start", where),
         ready=_str(table, "ready", where),
-        ready_timeout=duration("ready_timeout") or 60,
+        ready_timeout=60 if (ready := duration("ready_timeout")) is None else ready,
         teardown=_str(table, "teardown", where),
         timeout=duration("timeout"),
         junit=_str(table, "junit", where),
@@ -166,7 +179,12 @@ def load(root: Path) -> Config:
     try:
         data = tomllib.loads(path.read_text())
     except tomllib.TOMLDecodeError as error:
-        raise MutaspecError(USAGE, f"is not valid TOML: {error}.", where=CONFIG_FILE) from None
+        raise MutaspecError(
+            USAGE,
+            f"is not valid TOML: {error}.",
+            where=CONFIG_FILE,
+            hint="Fix the syntax at that line, or run 'mutaspec init --force' for a fresh draft.",
+        ) from None
 
     _check_keys(data, {"project", "suites"}, "top level")
     project = _project(data.get("project"))

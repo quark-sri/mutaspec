@@ -35,5 +35,10 @@ def list_files(root: Path) -> list[str]:
     """Tracked and untracked, not ignored files under `root`, as POSIX paths relative to it."""
     result = _git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z", ".")
     if result.returncode != 0:
-        raise MutaspecError(ENVIRONMENT, f"git ls-files failed: {result.stderr.strip()}")
+        raise MutaspecError(
+            ENVIRONMENT,
+            f"git ls-files failed: {result.stderr.strip()}",
+            where=str(root),
+            hint="Check that 'git status' works in this folder.",
+        )
     return sorted({p for p in result.stdout.split("\0") if p})

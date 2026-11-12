@@ -35,6 +35,10 @@ Status: approved.
 8. [x] Edge cases: multi-module (per-module globs, `api` commented), non-Maven commented template with message.
 9. [x] Golden + agents: commit `examples/shop/mutaspec.toml`; `--json` on every success path. Tests: AC12 (success), SC1 (init in `shop_repo` equals golden file and `config check` exits 0), SC2 (< 2 s). Update AGENTS.md demo line. (`intent/README.md` → `done` after the verifier passes.)
 
+## Departures (found by the verifier, 2026-11-12)
+- FR7: `openapi.*`, `swagger.*` and files in an `openapi/` folder count only with `.yaml`, `.yml` or `.json`; build output (`target/`, `build/`, `node_modules/`, `.mutaspec/`) is skipped. Other suffixes (for example `openapi.html`) are not requirement documents.
+- Left for 0002: FR3 free-port picking and placeholder checks. `--help` and `--version` print text even with `--json` (they are not commands).
+
 ## Risks
 - **Maven passing `-DbaseUrl` to tests**: Surefire copies user properties into the test JVM. Checked in step 4: the 4 API tests ran, none skipped. Fallback: `<systemPropertyVariables>` in the shop `pom.xml`.
 - **`target/*.jar` glob**: Spring Boot repackage leaves `x.jar` and `x.jar.original`; `*.jar` matches one. Checked in step 4: only `shop-0.1.0.jar`.
