@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from mutaspec import __version__, gitrepo
+from mutaspec.config import CONFIG_FILE, load
 from mutaspec.errors import OK, USAGE, MutaspecError
 
 Output = dict  # what a command returns: "lines" for people, the rest for --json
@@ -40,7 +41,11 @@ def _init(root: Path, args: argparse.Namespace) -> Output:
 
 
 def _config_check(root: Path, args: argparse.Namespace) -> Output:
-    raise NotImplementedError
+    config = load(root)
+    suites = [{"name": s.name, "level": s.level} for s in config.suites]
+    lines = [f"{CONFIG_FILE} is valid. Suites:"]
+    lines += [f"  {s['name']} ({s['level']})" for s in suites]
+    return {"lines": lines, "suites": suites}
 
 
 def main(argv: list[str] | None = None) -> int:
