@@ -3,9 +3,10 @@
 import re
 import tomllib
 from dataclasses import dataclass, fields
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
+from mutaspec import gitrepo
 from mutaspec.errors import USAGE, MutaspecError
 
 CONFIG_FILE = "mutaspec.toml"
@@ -183,4 +184,50 @@ def load(root: Path) -> Config:
             )
         seen.add(suite.name)
 
-    return Config(root=root, project=project, suites=suites)
+    config = Config(root=root, project=project, suites=suites)
+    _check_overlap(config)
+    return config
+
+
+def _matches(path: str, globs: tuple[str, ...]) -> bool:
+    pure = PurePosixPath(path)
+    return any(pure.full_match(glob) for glob in globs)
+
+
+def test_files(config: Config, files: list[str] | None = None) -> list[str]:
+    """Files matched by `tests`. A Mutant never changes these."""
+    files = gitrepo.list_files(config.root) if files is None else files
+    return [f for f in files if _matches(f, config.project.tests)]
+
+
+def source_files(config: Config, files: list[str] | None = None) -> list[str]:
+    """Files matched by `source`, minus `exclude` and minus every test file (spec FR6)."""
+    files = gitrepo.list_files(config.root) if files is None else files
+    tests = set(test_files(config, files))
+    return [
+        f
+        for f in files
+        if _matches(f, config.project.source)
+        and not _matches(f, config.project.exclude)
+        and f not in tests
+    ]
+
+
+def _check_overlap(config: Config, shown: int = 5) -> None:
+    """No file may be both source and test (spec AC7)."""
+    files = gitrepo.list_files(config.root)
+    project = config.project
+    both = [
+        f
+        for f in files
+        if _matches(f, project.source)
+        and not _matches(f, project.exclude)
+        and _matches(f, project.tests)
+    ]
+    if both:
+        more = f" and {len(both) - shown} more" if len(both) > shown else ""
+        raise _error(
+            "[project]",
+            f"'source' and 'tests' both match: {', '.join(both[:shown])}{more}.",
+            "Narrow 'source', or add these files to 'exclude'. Test files are never mutated.",
+        )

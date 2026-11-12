@@ -1,7 +1,8 @@
 import pytest
 from conftest import write
 
-from mutaspec.config import load, parse_duration
+from mutaspec import config as cfg
+from mutaspec.config import load, parse_duration, source_files
 from mutaspec.errors import MutaspecError
 
 VALID = """
@@ -154,3 +155,48 @@ def test_load_wrong_type_names_field(git_repo):
         load(git_repo)
 
     assert "source" in info.value.where
+
+
+def test_ac7_overlapping_source_and_tests_names_the_files(git_repo, run_cli):
+    write(git_repo, "src/shop/Price.java")
+    write(git_repo, "src/shop/PriceTest.java")
+    write(
+        git_repo,
+        "mutaspec.toml",
+        VALID.replace('"src/main/java/**"', '"src/**"').replace(
+            '"src/test/java/**"', '"src/**/*Test.java"'
+        ),
+    )
+
+    result = run_cli(git_repo, "config", "check")
+
+    assert result.code == 2
+    assert "src/shop/PriceTest.java" in result.err
+    assert "src/shop/Price.java" not in result.err.replace("PriceTest", "")
+
+
+def test_ac7_exclude_removes_the_overlap(git_repo, run_cli):
+    write(git_repo, "src/shop/Price.java")
+    write(git_repo, "src/shop/PriceTest.java")
+    text = VALID.replace('"src/main/java/**"', '"src/**"').replace(
+        '"src/test/java/**"', '"src/**/*Test.java"'
+    )
+    text = text.replace("[project]\n", '[project]\nexclude = ["**/*Test.java"]\n')
+    write(git_repo, "mutaspec.toml", text)
+
+    result = run_cli(git_repo, "config", "check")
+
+    assert result.code == 0, result.err
+
+
+def test_source_and_test_files_are_split_per_file(git_repo):
+    write(git_repo, "src/main/java/shop/Price.java")
+    write(git_repo, "src/main/java/shop/gen/Stub.java")
+    write(git_repo, "src/test/java/shop/PriceTest.java")
+    text = VALID.replace("[project]\n", '[project]\nexclude = ["**/gen/**"]\n')
+    write(git_repo, "mutaspec.toml", text)
+
+    config = load(git_repo)
+
+    assert source_files(config) == ["src/main/java/shop/Price.java"]
+    assert cfg.test_files(config) == ["src/test/java/shop/PriceTest.java"]

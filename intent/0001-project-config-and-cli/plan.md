@@ -27,7 +27,7 @@ Status: approved.
 ## Order of work (one commit each; test first, checks pass before each commit)
 1. [x] Skeleton: `pyproject.toml`, package, `cli.py` with both commands stubbed, `errors.py`, `gitrepo.py`, JSON/text output. Tests: AC10, AC12 (error path). 
 2. [x] Config load and validation. Tests: AC8, AC9, AC11, edge "unknown key", durations, duplicate names.
-3. [ ] Source/test overlap with `exclude` applied. Test: AC7 (FR6).
+3. [x] Source/test overlap with `exclude` applied. Test: AC7 (FR6).
 4. [ ] `examples/shop` fixture. Check by hand: `mvn -q verify` (unit) and the api flow (package, start, ready, `mvn test -Dgroups=api -DbaseUrl=…`) pass. Not part of pytest (pytest needs no Java).
 5. [ ] `init` for Maven: template, `--force`, `.mutaspec/.gitignore`, nothing else touched, `mvnw`. Tests: AC1, AC4, AC5, AC6, edge mvnw.
 6. [ ] `init` Spring Boot web: `api` Suite; actuator vs plain HTTP `ready`. Tests: AC2, edge no-actuator.
