@@ -29,7 +29,7 @@ Status: approved.
 2. [x] Config load and validation. Tests: AC8, AC9, AC11, edge "unknown key", durations, duplicate names.
 3. [x] Source/test overlap with `exclude` applied. Test: AC7 (FR6).
 4. [x] `examples/shop` fixture. Check by hand: `mvn -q verify` (unit) and the api flow (package, start, ready, `mvn test -Dgroups=api -DbaseUrl=…`) pass. Not part of pytest (pytest needs no Java).
-5. [ ] `init` for Maven: template, `--force`, `.mutaspec/.gitignore`, nothing else touched, `mvnw`. Tests: AC1, AC4, AC5, AC6, edge mvnw.
+5. [x] `init` for Maven: template, `--force`, `.mutaspec/.gitignore`, nothing else touched, `mvnw`. Tests: AC1, AC4, AC5, AC6, edge mvnw.
 6. [ ] `init` Spring Boot web: `api` Suite; actuator vs plain HTTP `ready`. Tests: AC2, edge no-actuator.
 7. [ ] `spec` globs. Test: AC3 (FR7).
 8. [ ] Edge cases: multi-module (per-module globs, `api` commented), non-Maven commented template with message.

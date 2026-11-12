@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from mutaspec import __version__, gitrepo
+from mutaspec import __version__, gitrepo, scaffold
 from mutaspec.config import CONFIG_FILE, load
 from mutaspec.errors import OK, USAGE, MutaspecError
 
@@ -37,7 +37,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _init(root: Path, args: argparse.Namespace) -> Output:
-    raise NotImplementedError
+    return scaffold.init(root, force=args.force)
 
 
 def _config_check(root: Path, args: argparse.Namespace) -> Output:
