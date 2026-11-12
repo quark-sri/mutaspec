@@ -29,6 +29,7 @@ class Project:
     web: bool = False  # Spring Boot web app: gets an api Suite
     actuator: bool = False  # has /actuator/health
     spec: tuple[str, ...] = ()  # requirement documents
+    modules: tuple[str, ...] = ()  # Maven modules of a parent pom
 
 
 def _toml(value) -> str:
@@ -89,18 +90,35 @@ def spec_globs(files: list[str]) -> list[str]:
     return found + sorted(contracts)
 
 
+def _modules(pom: ET.Element) -> list[str]:
+    """Module folders listed in a parent pom's <modules>."""
+    return [
+        child.text.strip()
+        for element in pom
+        if _local(element.tag) == "modules"
+        for child in element
+        if _local(child.tag) == "module" and child.text and child.text.strip()
+    ]
+
+
 def detect(root: Path) -> Project:
     pom = _pom(root)
     spec = tuple(spec_globs(gitrepo.list_files(root)))
     if pom is None:
         return Project(kind="unknown", spec=spec)
+    modules = tuple(_modules(pom))
     artifacts = _artifacts(pom)
+    for module in modules:
+        module_pom = _pom(root / module)
+        if module_pom is not None:
+            artifacts |= _artifacts(module_pom)
     return Project(
         kind="maven",
         spec=spec,
         mvn="./mvnw" if (root / "mvnw").is_file() else "mvn",
         web="spring-boot-starter-web" in artifacts,
         actuator="spring-boot-starter-actuator" in artifacts,
+        modules=modules,
     )
 
 
@@ -111,9 +129,6 @@ def _api_suite(project: Project) -> list[str]:
     else:
         ready = "curl -s -o /dev/null http://localhost:{port}/"  # any HTTP answer
     return [
-        "",
-        '# REST API tests (JUnit @Tag("api")) against the running app.',
-        "# mutaspec stops the 'start' process after 'run'.",
         "[[suites]]",
         'name = "api"',
         'level = "api"',
@@ -126,21 +141,31 @@ def _api_suite(project: Project) -> list[str]:
     ]
 
 
+def _commented(lines: list[str]) -> list[str]:
+    return [f"# {line}" if line else "#" for line in lines]
+
+
 def _spec_line(project: Project) -> str:
     if project.spec:
         return f"spec = {_toml(list(project.spec))}  # requirement documents"
     return '# spec = ["docs/**/*.md"]  # requirement documents (none found)'
 
 
-def render(project: Project) -> str:
+HEADER = "# Written by 'mutaspec init'. Check it, then run 'mutaspec config check'."
+
+
+def _render_maven(project: Project) -> str:
     mvn = project.mvn
+    prefixes = [f"{m}/" for m in project.modules] or [""]
+    source = [f"{p}src/main/java/**" for p in prefixes]
+    tests = [f"{p}src/test/java/**" for p in prefixes]
     lines = [
-        "# Written by 'mutaspec init'. Check it, then run 'mutaspec config check'.",
+        HEADER,
         "",
         "[project]",
         'baseline = "HEAD"  # git ref of the clean code',
-        f"source = {_toml(['src/main/java/**'])}  # files Mutants may change",
-        f"tests = {_toml(['src/test/java/**'])}  # files Mutants never change",
+        f"source = {_toml(source)}  # files Mutants may change",
+        f"tests = {_toml(tests)}  # files Mutants never change",
         _spec_line(project),
         f"build = {_toml(f'{mvn} -q -DskipTests test-compile')}  # fails -> Mutant is Invalid",
         "",
@@ -150,9 +175,65 @@ def render(project: Project) -> str:
         f"run = {_toml(f'{mvn} -q test -DexcludedGroups=api')}",
         'timeout = "300s"',
     ]
-    if project.web:
-        lines += _api_suite(project)
+    if project.web and project.modules:
+        lines += [
+            "",
+            "# Review before use: a multi-module project. Point 'setup' and 'start' at the",
+            "# module that holds the Spring Boot app, then remove the '# ' in front of each line.",
+            *_commented(_api_suite(project)),
+        ]
+    elif project.web:
+        lines += [
+            "",
+            '# REST API tests (JUnit @Tag("api")) against the running app.',
+            "# mutaspec stops the 'start' process after 'run'.",
+            *_api_suite(project),
+        ]
     return "\n".join(lines) + "\n"
+
+
+def _render_unknown(project: Project) -> str:
+    body = [
+        "[project]",
+        'baseline = "HEAD"  # git ref of the clean code',
+        'source = ["src/**"]  # files Mutants may change',
+        'tests = ["tests/**"]  # files Mutants never change',
+        _spec_line(project).removeprefix("# "),
+        'build = "make build"  # fails -> Mutant is Invalid',
+        "",
+        "[[suites]]",
+        'name = "unit"',
+        'level = "unit"  # unit, integration, api, ui or other',
+        'run = "make test"',
+        'timeout = "300s"',
+    ]
+    lines = [
+        HEADER,
+        "# The project type was not detected (mutaspec 0.1 detects Maven).",
+        "# Fill in the values, then remove the '# ' in front of each line.",
+        "",
+        *_commented(body),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def render(project: Project) -> str:
+    return _render_maven(project) if project.kind == "maven" else _render_unknown(project)
+
+
+def _message(project: Project) -> str:
+    if project.kind != "maven":
+        return (
+            f"Project type not detected yet; wrote a commented {CONFIG_FILE} template. "
+            "Fill it in, then run 'mutaspec config check'."
+        )
+    if project.web and project.modules:
+        kind = "a multi-module Maven project; review the commented api Suite"
+    elif project.web:
+        kind = "a Maven project with a Spring Boot web app (unit and api Suites)"
+    else:
+        kind = "a Maven project"
+    return f"Wrote {CONFIG_FILE} for {kind}. Check it, then run 'mutaspec config check'."
 
 
 def init(root: Path, force: bool) -> dict:
@@ -171,13 +252,10 @@ def init(root: Path, force: bool) -> dict:
     state.mkdir(exist_ok=True)
     (state / ".gitignore").write_text(STATE_GITIGNORE)
 
-    written = [CONFIG_FILE, f"{STATE_DIR}/.gitignore"]
+    message = _message(project)
     return {
-        "lines": [
-            f"Wrote {CONFIG_FILE} for a Maven project"
-            + (" with a Spring Boot web app (unit and api Suites)." if project.web else "."),
-            "Check it, then run 'mutaspec config check'.",
-        ],
+        "lines": [message],
+        "message": message,
         "project_type": project.kind,
-        "written": written,
+        "written": [CONFIG_FILE, f"{STATE_DIR}/.gitignore"],
     }

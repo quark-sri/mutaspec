@@ -223,3 +223,51 @@ def test_ac3_no_requirements_found_leaves_spec_as_a_comment(maven_repo, run_cli)
 
     assert "spec" not in read_config(maven_repo)["project"]
     assert "# spec = " in (maven_repo / "mutaspec.toml").read_text()
+
+
+PARENT_POM = """<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>example</groupId><artifactId>parent</artifactId><version>1</version>
+  <packaging>pom</packaging>
+  <modules>
+    <module>orders</module>
+    <module>web</module>
+  </modules>
+</project>
+"""
+
+
+def test_edge_multi_module_lists_each_module_and_comments_the_api_suite(git_repo, run_cli):
+    write(git_repo, "pom.xml", PARENT_POM)
+    write(git_repo, "orders/pom.xml", POM.format(deps=""))
+    write(git_repo, "web/pom.xml", POM.format(deps=dep("spring-boot-starter-web")))
+    commit_all(git_repo)
+
+    result = run_cli(git_repo, "init")
+
+    assert result.code == 0, result.err
+    config = read_config(git_repo)
+    assert config["project"]["source"] == ["orders/src/main/java/**", "web/src/main/java/**"]
+    assert config["project"]["tests"] == ["orders/src/test/java/**", "web/src/test/java/**"]
+    assert [s["name"] for s in config["suites"]] == ["unit"]  # api Suite is commented
+    text = (git_repo / "mutaspec.toml").read_text()
+    assert '# name = "api"' in text
+    assert "review" in result.out
+    assert run_cli(git_repo, "config", "check").code == 0
+
+
+@pytest.mark.parametrize("marker", ["build.gradle", "pyproject.toml", "package.json", "go.mod"])
+def test_edge_not_maven_writes_commented_template_and_says_so(git_repo, run_cli, marker):
+    write(git_repo, marker, "")
+    commit_all(git_repo)
+
+    result = run_cli(git_repo, "init", "--json")
+
+    assert result.code == 0
+    payload = result.json()
+    assert payload["project_type"] == "unknown"
+    assert "not detected" in payload["message"]
+    assert read_config(git_repo) == {}  # every line is a comment
+    text = (git_repo / "mutaspec.toml").read_text()
+    assert "# [[suites]]" in text
+    assert (git_repo / ".mutaspec/.gitignore").is_file()

@@ -32,7 +32,7 @@ Status: approved.
 5. [x] `init` for Maven: template, `--force`, `.mutaspec/.gitignore`, nothing else touched, `mvnw`. Tests: AC1, AC4, AC5, AC6, edge mvnw.
 6. [x] `init` Spring Boot web: `api` Suite; actuator vs plain HTTP `ready`. Tests: AC2, edge no-actuator.
 7. [x] `spec` globs. Test: AC3 (FR7).
-8. [ ] Edge cases: multi-module (per-module globs, `api` commented), non-Maven commented template with message.
+8. [x] Edge cases: multi-module (per-module globs, `api` commented), non-Maven commented template with message.
 9. [ ] Golden + agents: commit `examples/shop/mutaspec.toml`; `--json` on every success path. Tests: AC12 (success), SC1 (init in `shop_repo` equals golden file and `config check` exits 0), SC2 (< 2 s). Update AGENTS.md demo line, `intent/README.md`.
 
 ## Risks
