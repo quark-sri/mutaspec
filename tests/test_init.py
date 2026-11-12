@@ -192,3 +192,34 @@ def test_edge_mvnw_in_api_suite(maven_repo, run_cli):
     api = read_config(maven_repo)["suites"][1]
     assert api["setup"].startswith("./mvnw ")
     assert api["run"].startswith("./mvnw ")
+
+
+def test_ac3_openapi_and_docs_are_listed_in_spec(maven_repo, run_cli):
+    write(maven_repo, "openapi.yaml", "openapi: 3.0.3\n")
+    write(maven_repo, "docs/requirements.md", "# R1\n")
+
+    run_cli(maven_repo, "init")
+
+    assert read_config(maven_repo)["project"]["spec"] == ["docs/**/*.md", "openapi.yaml"]
+
+
+def test_ac3_contracts_found_in_common_places(maven_repo, run_cli):
+    write(maven_repo, "src/main/resources/openapi.yml", "")
+    write(maven_repo, "api/swagger.json", "{}")
+    write(maven_repo, "contracts/openapi/orders.yaml", "")
+    write(maven_repo, "target/classes/openapi.yml", "")  # build output, not a requirement
+
+    run_cli(maven_repo, "init")
+
+    assert read_config(maven_repo)["project"]["spec"] == [
+        "api/swagger.json",
+        "contracts/openapi/orders.yaml",
+        "src/main/resources/openapi.yml",
+    ]
+
+
+def test_ac3_no_requirements_found_leaves_spec_as_a_comment(maven_repo, run_cli):
+    run_cli(maven_repo, "init")
+
+    assert "spec" not in read_config(maven_repo)["project"]
+    assert "# spec = " in (maven_repo / "mutaspec.toml").read_text()
