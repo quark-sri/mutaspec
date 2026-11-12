@@ -129,3 +129,66 @@ def test_init_json_reports_what_was_written(maven_repo, run_cli):
     assert payload["ok"] is True
     assert payload["project_type"] == "maven"
     assert sorted(payload["written"]) == [".mutaspec/.gitignore", "mutaspec.toml"]
+
+
+def spring_repo(repo, *artifacts):
+    deps = "\n".join(dep(a) for a in artifacts)
+    write(repo, "pom.xml", POM.format(deps=deps))
+    commit_all(repo)
+    return repo
+
+
+def test_ac2_spring_boot_web_gets_api_suite(maven_repo, run_cli):
+    spring_repo(maven_repo, "spring-boot-starter-web", "spring-boot-starter-actuator")
+
+    result = run_cli(maven_repo, "init")
+
+    assert result.code == 0, result.err
+    unit, api = read_config(maven_repo)["suites"]
+    assert unit["run"] == "mvn -q test -DexcludedGroups=api"
+    assert api["name"] == "api"
+    assert api["level"] == "api"
+    assert api["setup"] == "mvn -q -DskipTests package"  # builds the app
+    assert api["start"] == "java -jar target/*.jar --server.port={port}"  # starts it on {port}
+    assert api["ready"] == "curl -sf http://localhost:{port}/actuator/health"  # waits
+    assert api["run"] == "mvn -q test -Dgroups=api -DbaseUrl=http://localhost:{port}"
+    assert "teardown" not in api  # mutaspec stops the start process itself
+    assert "stops" in (maven_repo / "mutaspec.toml").read_text()
+
+
+def test_ac2_api_suite_passes_config_check(maven_repo, run_cli):
+    spring_repo(maven_repo, "spring-boot-starter-web", "spring-boot-starter-actuator")
+    run_cli(maven_repo, "init")
+
+    result = run_cli(maven_repo, "config", "check")
+
+    assert result.code == 0, result.err
+    assert "api (api)" in result.out
+
+
+def test_ac2_no_web_starter_means_no_api_suite(maven_repo, run_cli):
+    spring_repo(maven_repo, "spring-boot-starter", "spring-boot-starter-actuator")
+
+    run_cli(maven_repo, "init")
+
+    assert [s["name"] for s in read_config(maven_repo)["suites"]] == ["unit"]
+
+
+def test_edge_no_actuator_ready_waits_for_any_http_answer(maven_repo, run_cli):
+    spring_repo(maven_repo, "spring-boot-starter-web")
+
+    run_cli(maven_repo, "init")
+
+    api = read_config(maven_repo)["suites"][1]
+    assert api["ready"] == "curl -s -o /dev/null http://localhost:{port}/"
+
+
+def test_edge_mvnw_in_api_suite(maven_repo, run_cli):
+    spring_repo(maven_repo, "spring-boot-starter-web")
+    write(maven_repo, "mvnw", "#!/bin/sh\n")
+
+    run_cli(maven_repo, "init")
+
+    api = read_config(maven_repo)["suites"][1]
+    assert api["setup"].startswith("./mvnw ")
+    assert api["run"].startswith("./mvnw ")

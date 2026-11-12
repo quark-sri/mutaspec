@@ -25,6 +25,8 @@ class Project:
 
     kind: str  # "maven" or "unknown"
     mvn: str = "mvn"
+    web: bool = False  # Spring Boot web app: gets an api Suite
+    actuator: bool = False  # has /actuator/health
 
 
 def _toml(value) -> str:
@@ -46,11 +48,54 @@ def _pom(root: Path) -> ET.Element | None:
         ) from None
 
 
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]  # drop the XML namespace
+
+
+def _artifacts(pom: ET.Element) -> set[str]:
+    """artifactIds of every dependency in the pom."""
+    found = set()
+    for element in pom.iter():
+        if _local(element.tag) == "dependency":
+            for child in element:
+                if _local(child.tag) == "artifactId" and child.text:
+                    found.add(child.text.strip())
+    return found
+
+
 def detect(root: Path) -> Project:
-    if _pom(root) is None:
+    pom = _pom(root)
+    if pom is None:
         return Project(kind="unknown")
-    mvn = "./mvnw" if (root / "mvnw").is_file() else "mvn"
-    return Project(kind="maven", mvn=mvn)
+    artifacts = _artifacts(pom)
+    return Project(
+        kind="maven",
+        mvn="./mvnw" if (root / "mvnw").is_file() else "mvn",
+        web="spring-boot-starter-web" in artifacts,
+        actuator="spring-boot-starter-actuator" in artifacts,
+    )
+
+
+def _api_suite(project: Project) -> list[str]:
+    mvn = project.mvn
+    if project.actuator:
+        ready = "curl -sf http://localhost:{port}/actuator/health"
+    else:
+        ready = "curl -s -o /dev/null http://localhost:{port}/"  # any HTTP answer
+    return [
+        "",
+        '# REST API tests (JUnit @Tag("api")) against the running app.',
+        "# mutaspec stops the 'start' process after 'run'.",
+        "[[suites]]",
+        'name = "api"',
+        'level = "api"',
+        f"setup = {_toml(f'{mvn} -q -DskipTests package')}",
+        f"start = {_toml('java -jar target/*.jar --server.port={port}')}",
+        f"ready = {_toml(ready)}",
+        'ready_timeout = "60s"',
+        f"run = {_toml(f'{mvn} -q test -Dgroups=api -DbaseUrl=http://localhost:{{port}}')}",
+        'timeout = "300s"',
+    ]
 
 
 def render(project: Project) -> str:
@@ -70,6 +115,8 @@ def render(project: Project) -> str:
         f"run = {_toml(f'{mvn} -q test -DexcludedGroups=api')}",
         'timeout = "300s"',
     ]
+    if project.web:
+        lines += _api_suite(project)
     return "\n".join(lines) + "\n"
 
 
@@ -92,7 +139,8 @@ def init(root: Path, force: bool) -> dict:
     written = [CONFIG_FILE, f"{STATE_DIR}/.gitignore"]
     return {
         "lines": [
-            f"Wrote {CONFIG_FILE} for a Maven project.",
+            f"Wrote {CONFIG_FILE} for a Maven project"
+            + (" with a Spring Boot web app (unit and api Suites)." if project.web else "."),
             "Check it, then run 'mutaspec config check'.",
         ],
         "project_type": project.kind,
