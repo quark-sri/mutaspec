@@ -4,3 +4,4 @@ __pycache__/
 .mutaspec/runs/
 .mutaspec/worktrees/
 dist/
+examples/shop/target/

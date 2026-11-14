@@ -1,0 +1,26 @@
+# Written by 'mutaspec init'. Check it, then run 'mutaspec config check'.
+
+[project]
+baseline = "HEAD"  # git ref of the clean code
+source = ["src/main/java/**"]  # files Mutants may change
+tests = ["src/test/java/**"]  # files Mutants never change
+spec = ["docs/**/*.md", "src/main/resources/openapi.yaml"]  # requirement documents
+build = "mvn -q -DskipTests test-compile"  # fails -> Mutant is Invalid
+
+[[suites]]
+name = "unit"
+level = "unit"
+run = "mvn -q test -DexcludedGroups=api"
+timeout = "300s"
+
+# REST API tests (JUnit @Tag("api")) against the running app.
+# mutaspec stops the 'start' process after 'run'.
+[[suites]]
+name = "api"
+level = "api"
+setup = "mvn -q -DskipTests package"
+start = "java -jar target/*.jar --server.port={port}"
+ready = "curl -sf http://localhost:{port}/actuator/health"
+ready_timeout = "60s"
+run = "mvn -q test -Dgroups=api -DbaseUrl=http://localhost:{port}"
+timeout = "300s"
