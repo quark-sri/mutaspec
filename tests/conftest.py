@@ -1,6 +1,8 @@
 import json
+import shlex
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -76,3 +78,33 @@ def shop_repo(git_repo: Path) -> Path:
     )
     commit_all(git_repo)
     return git_repo
+
+
+TOOL = Path(__file__).with_name("suite_tool.py")
+
+
+def tool(*args: object) -> str:
+    """A shell command that runs tests/suite_tool.py (no Java needed)."""
+    return shlex.join([sys.executable, str(TOOL), *map(str, args)])
+
+
+def _toml(value: object) -> str:
+    return json.dumps(value) if isinstance(value, str) else str(value).lower()
+
+
+@pytest.fixture
+def make_project(git_repo: Path):
+    """Write and commit a project whose Suites are given as dicts; return its root."""
+
+    def _make(*suites: dict, project: str = "") -> Path:
+        lines = ["[project]", 'source = ["src/**"]', 'tests = ["tests/**"]', project]
+        for suite in suites:
+            lines += ["", "[[suites]]"]
+            lines += [f"{key} = {_toml(value)}" for key, value in suite.items()]
+        write(git_repo, "mutaspec.toml", "\n".join(lines) + "\n")
+        write(git_repo, "src/app.txt", "app\n")
+        write(git_repo, "tests/app_test.txt", "test\n")
+        commit_all(git_repo)
+        return git_repo
+
+    return _make

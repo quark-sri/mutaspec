@@ -1,4 +1,4 @@
-"""Command line: `mutaspec init`, `mutaspec config check`. Every command takes --json (AC12)."""
+"""Command line: `init`, `config check`, `baseline`. Every command takes --json (spec 0001 AC12)."""
 
 import argparse
 import json
@@ -6,11 +6,14 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from mutaspec import __version__, gitrepo, scaffold
+from mutaspec import __version__, baseline, gitrepo, scaffold
 from mutaspec.config import CONFIG_FILE, load
 from mutaspec.errors import OK, USAGE, MutaspecError
 
 Output = dict  # what a command returns: "lines" for people, the rest for --json
+# Optional keys: "exit_code" (default 0), "warnings" (stderr for people, a list in --json).
+
+INTERRUPTED = 130  # Ctrl-C, shell convention (D24)
 
 
 class _Parser(argparse.ArgumentParser):
@@ -33,6 +36,17 @@ def _parser() -> argparse.ArgumentParser:
     check = config_sub.add_parser("check", help="load and check mutaspec.toml")
     check.add_argument("--json", action="store_true", help="print one JSON object on stdout")
     check.set_defaults(handler=_config_check)
+
+    base = sub.add_parser(
+        "baseline", help="run every Suite on the clean code and check it is ready"
+    )
+    base.add_argument(
+        "--include-uncommitted",
+        action="store_true",
+        help="also use uncommitted changes and new files (baseline must be HEAD)",
+    )
+    base.add_argument("--json", action="store_true", help="print one JSON object on stdout")
+    base.set_defaults(handler=_baseline)
     return parser
 
 
@@ -46,6 +60,10 @@ def _config_check(root: Path, args: argparse.Namespace) -> Output:
     lines = [f"{CONFIG_FILE} is valid. Suites:"]
     lines += [f"  {s['name']} ({s['level']})" for s in suites]
     return {"lines": lines, "suites": suites}
+
+
+def _baseline(root: Path, args: argparse.Namespace) -> Output:
+    return baseline.run(load(root), include_uncommitted=args.include_uncommitted)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -64,11 +82,23 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"mutaspec: {error}", file=sys.stderr)
         return error.exit_code
+    except KeyboardInterrupt:
+        message = "interrupted; started processes were stopped and teardown ran."
+        if as_json:
+            print(
+                json.dumps({"ok": False, "exit_code": INTERRUPTED, "error": {"message": message}})
+            )
+        else:
+            print(f"mutaspec: {message}", file=sys.stderr)
+        return INTERRUPTED
 
+    exit_code = output.get("exit_code", OK)
     if as_json:
-        data = {k: v for k, v in output.items() if k != "lines"}
-        print(json.dumps({"ok": True, "exit_code": OK, **data}))
+        data = {k: v for k, v in output.items() if k not in ("lines", "exit_code")}
+        print(json.dumps({"ok": exit_code == OK, "exit_code": exit_code, **data}))
     else:
+        for warning in output.get("warnings", []):
+            print(f"mutaspec: {warning}", file=sys.stderr)
         for line in output.get("lines", []):
             print(line)
-    return OK
+    return exit_code
