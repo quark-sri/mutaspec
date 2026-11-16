@@ -2,11 +2,20 @@
 
 import json
 
+import pytest
 from conftest import git, tool, write
 
+from mutaspec import baseline, process
 from mutaspec.errors import ENVIRONMENT, OK
 
 RESULT = ".mutaspec/runs/baseline.json"
+
+
+@pytest.fixture(autouse=True)
+def fast_waits(monkeypatch):
+    """Shorter waits than the real 1s ready poll and 10s stop grace; same behaviour."""
+    monkeypatch.setattr(baseline, "READY_POLL", 0.1)
+    monkeypatch.setattr(process, "STOP_GRACE", 1.0)
 
 
 def result(root):
@@ -359,3 +368,125 @@ def test_sc2_failing_and_flaky_tests_are_named_in_10_of_10_runs(make_project, ru
         assert (tests["shop.T#b"], tests["shop.T#c"]) == ("failing", "flaky")
         assert "shop.T#b" in out.out
         assert "shop.T#c" in out.out
+
+
+# S3 services
+
+
+def started_pids(pidfile):
+    return [int(p) for line in pidfile.read_text().splitlines() for p in line.split()[:2]]
+
+
+def all_gone(pids, wait=3.0):
+    import os
+    import time
+
+    deadline = time.monotonic() + wait
+    alive = list(pids)
+    while alive and time.monotonic() < deadline:
+        still = []
+        for pid in alive:
+            try:
+                os.kill(pid, 0)
+                still.append(pid)
+            except ProcessLookupError:
+                pass
+        alive = still
+        if alive:
+            time.sleep(0.05)
+    return not alive
+
+
+def service_suite(tmp_path, run, **more):
+    pids = tmp_path / "pids"
+    return suite(
+        "api",
+        run,
+        level="api",
+        start=more.pop("start", tool("serve", pids, "{port}")),
+        ready=more.pop("ready", tool("probe", "{port}")),
+        ready_timeout=more.pop("ready_timeout", "5s"),
+        teardown=tool("record", tmp_path / "teardown", "teardown"),
+        **more,
+    )
+
+
+def test_ac10_ready_never_succeeds_stops_start_and_runs_teardown(make_project, run_cli, tmp_path):
+    root = make_project(
+        service_suite(tmp_path, tool("exit", 0), ready=tool("exit", 1), ready_timeout="1s")
+    )
+
+    out = run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert out.code == ENVIRONMENT
+    assert entry["reason"] == "service did not become ready within 1s"
+    assert all_gone(started_pids(tmp_path / "pids"))
+    assert (tmp_path / "teardown").read_text().count("teardown") == 1
+
+
+@pytest.mark.parametrize("code", [0, 1])
+def test_ac11_start_is_stopped_after_each_run(make_project, run_cli, tmp_path, code):
+    root = make_project(service_suite(tmp_path, tool("exit", code)))
+
+    run_cli(root, "baseline")
+
+    pids = started_pids(tmp_path / "pids")
+    assert len(pids) == 4  # 2 runs x (service + its child)
+    assert all_gone(pids)
+    assert (tmp_path / "teardown").read_text().count("teardown") == 1
+
+
+def test_ac13_port_is_the_same_in_start_ready_and_run(make_project, run_cli, tmp_path):
+    ports = tmp_path / "ports"
+    root = make_project(service_suite(tmp_path, tool("record", ports, "{port}")))
+
+    out = run_cli(root, "baseline")
+
+    assert out.code == OK
+    served = [line.split()[2] for line in (tmp_path / "pids").read_text().splitlines()]
+    used = [line.split()[0] for line in ports.read_text().splitlines()]
+    assert used == served
+    assert all(p.isdigit() for p in used)
+
+
+def test_ac14_suite_longer_than_its_timeout_is_broken(make_project, run_cli, tmp_path):
+    root = make_project(service_suite(tmp_path, tool("sleep", 30), timeout="1s"))
+
+    out = run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert out.code == ENVIRONMENT
+    assert entry["reason"] == "took longer than 1s"
+    assert len(entry["durations"]) == 1
+    assert all_gone(started_pids(tmp_path / "pids"))
+
+
+def test_edge_start_exits_before_ready_is_broken(make_project, run_cli, tmp_path):
+    root = make_project(
+        service_suite(
+            tmp_path,
+            tool("exit", 0),
+            start=tool("serve", tmp_path / "pids", "{port}", "--die"),
+            ready=tool("exit", 1),
+        )
+    )
+
+    out = run_cli(root, "baseline")
+
+    assert out.code == ENVIRONMENT
+    assert result(root)["suites"][0]["reason"] == "service stopped before it was ready"
+
+
+def test_d38_duration_covers_start_to_stop(make_project, run_cli, tmp_path):
+    root = make_project(
+        service_suite(
+            tmp_path,
+            tool("exit", 0),
+            start=f"sleep 0.5; {tool('serve', tmp_path / 'pids', '{port}')}",
+        )
+    )
+
+    run_cli(root, "baseline")
+
+    assert all(d >= 0.5 for d in result(root)["suites"][0]["durations"])

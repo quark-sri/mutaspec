@@ -8,7 +8,8 @@ run 2 without randomness. Usage (STATE is a file outside the worktree):
     junit STATE [--exit N] T=OUT.. write target/surefire-reports/TEST-T.xml; OUT has one
                                    letter per run: p pass, f fail, s skip; exit 1 when a
                                    test failed (or N)
-    serve PIDFILE PORT [--die]     a service with one child process; writes both pids
+    serve PIDFILE PORT [--die]     a service with one child process; appends both pids
+                                   and the port to PIDFILE
     probe PORT                     exit 0 when PORT accepts a connection
     record FILE TEXT               append "TEXT <cwd>" to FILE
     sleep S                        sleep S seconds
@@ -51,7 +52,8 @@ def _junit(state: str, args: list[str]) -> int:
 
 def _serve(pidfile: str, port: int, die: bool) -> int:
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
-    Path(pidfile).write_text(f"{os.getpid()} {child.pid}\n")
+    with open(pidfile, "a") as out:
+        out.write(f"{os.getpid()} {child.pid} {port}\n")
     if die:
         return 1
     with socket.socket() as sock:

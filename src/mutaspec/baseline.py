@@ -24,6 +24,7 @@ RESULT_FILE = RUNS / "baseline.json"
 LOGS = RUNS / "baseline"
 
 OK_STATUS, BROKEN = "ok", "broken"
+READY_POLL = 1.0  # seconds between `ready` checks (D31)
 
 
 @dataclass
@@ -130,9 +131,21 @@ class _SuiteRun:
         suite, log = self.suite, self._log(str(n))
         if suite.junit is not None:
             junit.clear(self.cwd, suite.junit)  # D29
-        started = time.monotonic()
-        done = process.run(suite.run, self.cwd, log, timeout=suite.timeout)
-        self.result.durations.append(time.monotonic() - started)
+        commands = (suite.start, suite.ready, suite.run)
+        port = process.free_port() if any("{port}" in (c or "") for c in commands) else None
+        started = time.monotonic()  # D38: one repeat, from `start` to stop
+        service = None
+        try:
+            if suite.start is not None:
+                service = process.spawn(process.with_port(suite.start, port), self.cwd, log)
+                self._wait_ready(service, port, log)
+            run = process.with_port(suite.run, port)
+            done = process.run(run, self.cwd, log, timeout=suite.timeout)
+        finally:
+            if service is not None:
+                with no_interrupts():
+                    process.stop(service)  # AC11
+            self.result.durations.append(time.monotonic() - started)
         if done.timed_out:
             raise _Broken(f"took longer than {seconds(suite.timeout or 0)}", log)
         code = done.code or 0
@@ -140,6 +153,23 @@ class _SuiteRun:
         self.last_log = log
         if suite.junit is not None:
             self._read_tests(code, log)
+
+    def _wait_ready(self, service, port: int | None, log: Path) -> None:
+        """FR3: poll `ready` every second until it succeeds or `ready_timeout` ends (AC10)."""
+        if self.suite.ready is None:
+            return
+        check = process.with_port(self.suite.ready, port)
+        limit = self.suite.ready_timeout
+        deadline = time.monotonic() + limit
+        while True:
+            if service.poll() is not None:
+                raise _Broken("service stopped before it was ready", log)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise _Broken(f"service did not become ready within {seconds(limit)}", log)
+            if process.run(check, self.cwd, log, timeout=remaining).code == 0:
+                return
+            time.sleep(max(0.0, min(READY_POLL, deadline - time.monotonic())))
 
     def _read_tests(self, code: int, log: Path) -> None:
         """FR6: a non-zero exit must be explained by a failed test, or the Suite is broken."""
