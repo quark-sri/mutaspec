@@ -52,6 +52,7 @@ Hard-to-reverse decisions also get an ADR in [adr/](adr/); intents and specs rec
 | D43 | 2026-11-17 | agent | The uncommitted-files warning and `--include-uncommitted` cover only files under the project root. | Same scope as `git ls-files` in spec 0001. | plan 0002 |
 | D44 | 2026-11-17 | agent | Every Suite command runs in its own process group; SIGINT is ignored while mutaspec stops processes and runs `teardown`. | Ctrl-C reaches only mutaspec, and a second Ctrl-C cannot skip `teardown`. | plan 0002 |
 | D45 | 2026-11-17 | agent | v0.1 runs Suites on POSIX systems only (macOS, Linux). | Process groups need `os.killpg`. Windows later, if asked. | plan 0002 |
+| D46 | 2026-11-17 | agent | mutaspec writes a `.gitignore` of `*` into each output folder it makes (`.mutaspec/worktrees/`, `.mutaspec/runs/`). | Keeps the user's `git status` unchanged (AC15) also when `init` did not write `.mutaspec/.gitignore`. Rejected: require `init` first (fails on hand-written configs); edit `.git/info/exclude` (changes the user's repository settings). | plan 0002 |
 
 ## Open (not yet decided)
 - Should `init` also detect Spring Boot 4 (`spring-boot-starter-webmvc`)? Raised 2026-11-12 after building 0001.
