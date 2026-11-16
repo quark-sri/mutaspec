@@ -34,7 +34,7 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 3. [x] `process.py`: process groups, timeout, stop with grace, free port, log tail. Tests: AC14 (unit level), a child process is killed with its group, `free_port` can be bound.
 4. [x] `junit.py`: parse Surefire XML (failure, error, skipped), clear old files, combine runs. Tests: FR5 table, AC5/AC6 at unit level.
 5. [x] `baseline.py` + CLI, Suites without services: lifecycle without `start`, repeats, FR6 without `junit`, `baseline.json`, logs, text output, `--json`, exit codes. Tests: AC1, AC2, AC3, AC4, AC7, AC9 (end to end), edge "setup failed" (no repeats, teardown runs), edge "teardown fails".
-6. [ ] `junit` in the baseline: AC5, AC6, AC8, edges "junit matches no files" and "no test passes", D29 old XML. SC2 (10 runs, both names reported every time).
+6. [x] `junit` in the baseline: AC5, AC6, AC8, edges "junit matches no files" and "no test passes", D29 old XML. SC2 (10 runs, both names reported every time).
 7. [ ] Services: `start`/`ready`/stop/`teardown`, `{port}`. Tests: AC10, AC11, AC13, AC14 (end to end), edge "start exits before ready".
 8. [ ] Ctrl-C: subprocess `python -m mutaspec baseline`, SIGINT to its pid. Tests: AC12 (exit 130, start pid and child pid dead, teardown marker written, no `baseline.json`), AC15 after Ctrl-C, SC3 (20 runs mixing Ctrl-C and ready timeouts; `ready_timeout = "1s"`, grace patched down).
 9. [ ] `init` writes `junit`; update the golden file. Tests: AC19, the existing SC1 golden test. Manual: `uv run mutaspec baseline` in `examples/shop` says "ready" (SC1 time check). Update the AGENTS.md demo line. Then the verifier; then `intent/README.md` → done.

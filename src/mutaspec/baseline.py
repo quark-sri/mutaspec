@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-from mutaspec import process, worktree
+from mutaspec import junit, process, worktree
 from mutaspec.config import Config, Suite
 from mutaspec.errors import ENVIRONMENT, OK
 
@@ -37,9 +37,13 @@ class SuiteResult:
     log: str | None = None  # the log to read for `reason`
     tail: str = ""
     warnings: list[str] = field(default_factory=list)
+    tests: dict[str, str] | None = None  # only when the Suite has `junit` (FR8)
+
+    def excluded(self, status: str) -> list[str]:
+        return [t for t, s in (self.tests or {}).items() if s == status]
 
     def to_json(self) -> dict:
-        return {
+        data = {
             "name": self.name,
             "level": self.level,
             "status": self.status,
@@ -49,6 +53,9 @@ class SuiteResult:
             "log": self.log,
             "warnings": self.warnings,
         }
+        if self.tests is not None:
+            data["tests"] = self.tests
+        return data
 
 
 class _Broken(Exception):
@@ -82,6 +89,9 @@ class _SuiteRun:
         self.result = SuiteResult(suite.name, suite.level)
         self.codes: list[int] = []
         self.last_log: Path | None = None
+        self.test_runs: list[dict[str, str]] = []
+        if suite.junit is not None:
+            self.result.tests = {}
 
     def _log(self, part: str) -> Path:
         return self.logs / f"{self.suite.name}-{part}.log"
@@ -118,16 +128,52 @@ class _SuiteRun:
 
     def _repeat(self, n: int) -> None:
         suite, log = self.suite, self._log(str(n))
+        if suite.junit is not None:
+            junit.clear(self.cwd, suite.junit)  # D29
         started = time.monotonic()
         done = process.run(suite.run, self.cwd, log, timeout=suite.timeout)
         self.result.durations.append(time.monotonic() - started)
         if done.timed_out:
             raise _Broken(f"took longer than {seconds(suite.timeout or 0)}", log)
-        self.codes.append(done.code or 0)
+        code = done.code or 0
+        self.codes.append(code)
         self.last_log = log
+        if suite.junit is not None:
+            self._read_tests(code, log)
+
+    def _read_tests(self, code: int, log: Path) -> None:
+        """FR6: a non-zero exit must be explained by a failed test, or the Suite is broken."""
+        try:
+            outcomes = junit.read_results(self.cwd, self.suite.junit or "")
+        except junit.JunitError as error:
+            raise _Broken(str(error), log) from None
+        if code != 0 and not {"failed", "flaky"} & set(outcomes.values()):
+            raise _Broken(
+                f"exited with code {code}, but its JUnit XML shows no failed test",
+                log,
+                hint="For example, the build failed. Read the log.",
+            )
+        self.test_runs.append(outcomes)
 
     def _judge(self) -> None:
-        """FR6 for a Suite without `junit`: any non-zero run makes it broken."""
+        if self.suite.junit is not None:
+            self._judge_tests()
+        else:
+            self._judge_codes()
+
+    def _judge_tests(self) -> None:
+        """FR5, FR6 with `junit`: failing and flaky tests are excluded; one must pass."""
+        tests = junit.combine(self.test_runs)
+        self.result.tests = tests
+        if not any(self.test_runs):
+            self.result.warnings.append(
+                f"no file matched junit = {self.suite.junit!r}; per-test results are missing."
+            )
+        elif junit.PASS not in tests.values():
+            raise _Broken("no test passes on the clean code", self.last_log)
+
+    def _judge_codes(self) -> None:
+        """FR6 without `junit`: any non-zero run makes the Suite broken."""
         failed = [code != 0 for code in self.codes]
         if all(failed):
             raise _Broken(f"failed on every run (exit code {self.codes[-1]})", self.last_log)
@@ -156,6 +202,11 @@ def _text(data: dict, results: list[SuiteResult], base: worktree.Base) -> list[s
         if r.status == OK_STATUS:
             times = ", ".join(f"{d:.1f}s" for d in r.durations)
             lines.append(f"  {r.name} ({r.level}): ok, {times}")
+            for status in (junit.FAILING, junit.FLAKY):
+                tests = r.excluded(status)
+                if tests:
+                    lines.append(f"    {len(tests)} {status} test(s), excluded from scoring:")
+                    lines += [f"      {t}" for t in tests]
         else:
             lines.append(f"  {r.name} ({r.level}): broken: {r.reason}")
             lines += [f"    | {line}" for line in r.tail.splitlines()]

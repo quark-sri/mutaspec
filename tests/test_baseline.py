@@ -250,3 +250,112 @@ def test_d40_old_result_is_removed_when_a_baseline_starts(make_project, run_cli)
     run_cli(root, "baseline")
 
     assert "old" not in result(root)
+
+
+# S2 with junit
+
+JUNIT = "**/target/surefire-reports/TEST-*.xml"
+
+
+def junit_suite(state, *tests, exit=None, **more):
+    args = ["junit", state, *(["--exit", exit] if exit is not None else []), *tests]
+    return suite("unit", tool(*args), junit=JUNIT, **more)
+
+
+def test_ac5_test_failing_every_run_is_listed_and_suite_stays_ok(make_project, run_cli, tmp_path):
+    root = make_project(junit_suite(tmp_path / "n", "a=pp", "b=ff"))
+
+    out = run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert out.code == OK
+    assert entry["status"] == "ok"
+    assert entry["tests"] == {"shop.T#a": "pass", "shop.T#b": "failing"}
+    assert "shop.T#b" in out.out
+
+
+def test_ac6_test_that_flips_is_flaky_and_suite_stays_ok(make_project, run_cli, tmp_path):
+    root = make_project(junit_suite(tmp_path / "n", "a=pp", "c=fp"))
+
+    out = run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert out.code == OK
+    assert entry["status"] == "ok"
+    assert entry["tests"]["shop.T#c"] == "flaky"
+    assert "shop.T#c" in out.out
+
+
+def test_ac8_non_zero_exit_with_no_failed_test_in_xml_is_broken(make_project, run_cli, tmp_path):
+    root = make_project(junit_suite(tmp_path / "n", "a=pp", exit=1))
+
+    out = run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert out.code == ENVIRONMENT
+    assert entry["status"] == "broken"
+    assert "no failed test" in entry["reason"]
+
+
+def test_ac8_non_zero_exit_with_no_xml_at_all_is_broken(make_project, run_cli):
+    root = make_project(suite("unit", tool("exit", 1), junit=JUNIT))
+
+    run_cli(root, "baseline")
+
+    assert result(root)["suites"][0]["status"] == "broken"
+
+
+def test_edge_junit_matches_no_files_after_exit_0_is_ok_with_warning(make_project, run_cli):
+    root = make_project(suite("unit", tool("exit", 0), junit=JUNIT))
+
+    out = run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert out.code == OK
+    assert entry["status"] == "ok"
+    assert entry["tests"] == {}
+    assert "per-test results are missing" in entry["warnings"][0]
+    assert "per-test results are missing" in out.out
+
+
+def test_edge_no_test_passes_is_broken(make_project, run_cli, tmp_path):
+    root = make_project(junit_suite(tmp_path / "n", "a=ff", "b=fp"))
+
+    out = run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert out.code == ENVIRONMENT
+    assert entry["reason"] == "no test passes on the clean code"
+
+
+def test_d29_old_xml_is_deleted_before_each_run(make_project, run_cli, tmp_path):
+    old = '<testsuite><testcase classname="old.T" name="x"><failure/></testcase></testsuite>'
+    setup = f"mkdir -p target/surefire-reports && echo '{old}' > target/surefire-reports/TEST-o.xml"
+    root = make_project(suite("unit", tool("exit", 0), junit=JUNIT, setup=setup))
+
+    run_cli(root, "baseline")
+
+    entry = result(root)["suites"][0]
+    assert entry["status"] == "ok"
+    assert "old.T#x" not in entry["tests"]
+
+
+def test_fr8_tests_are_left_out_when_junit_is_not_set(make_project, run_cli):
+    root = make_project(suite("unit", tool("exit", 0)))
+
+    run_cli(root, "baseline")
+
+    assert "tests" not in result(root)["suites"][0]
+
+
+def test_sc2_failing_and_flaky_tests_are_named_in_10_of_10_runs(make_project, run_cli, tmp_path):
+    state = tmp_path / "n"
+    root = make_project(junit_suite(state, "a=pp", "b=ff", "c=fp"))
+
+    for _ in range(10):
+        state.unlink(missing_ok=True)
+        out = run_cli(root, "baseline")
+        tests = result(root)["suites"][0]["tests"]
+        assert (tests["shop.T#b"], tests["shop.T#c"]) == ("failing", "flaky")
+        assert "shop.T#b" in out.out
+        assert "shop.T#c" in out.out
