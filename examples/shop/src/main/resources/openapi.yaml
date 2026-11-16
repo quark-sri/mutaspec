@@ -1,0 +1,69 @@
+openapi: 3.0.3
+info:
+  title: Shop
+  version: 0.1.0
+  description: Example service measured by mutaspec. Rules in docs/requirements.md.
+paths:
+  /products/{id}:
+    get:
+      summary: Read a product (R1)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "404": { description: Unknown product }
+  /orders:
+    post:
+      summary: Place an order (R2-R7)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderRequest" }
+      responses:
+        "201":
+          description: Order placed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "400": { description: Quantity not from 1 to 10 }
+        "404": { description: Unknown product }
+        "409": { description: Not enough stock }
+  /orders/{id}:
+    get:
+      summary: Read an order (R7)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: The order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { description: Unknown order }
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        priceCents: { type: integer }
+        stock: { type: integer }
+    OrderRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string }
+        quantity: { type: integer, minimum: 1, maximum: 10 }
+    Order:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: string }
+        quantity: { type: integer }
+        totalCents: { type: integer }
