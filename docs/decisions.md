@@ -50,9 +50,11 @@ Hard-to-reverse decisions also get an ADR in [adr/](adr/); intents and specs rec
 | D41 | 2026-11-17 | agent | Only the literal text `{port}` is replaced in Suite commands; other braces are left as they are. | Shell `${VAR}` must keep working. | plan 0002 |
 | D42 | 2026-11-17 | agent | A Suite with no `timeout` has no time limit. | `init` always writes one; the user may remove it on purpose. | plan 0002 |
 | D43 | 2026-11-17 | agent | The uncommitted-files warning and `--include-uncommitted` cover only files under the project root. | Same scope as `git ls-files` in spec 0001. | plan 0002 |
-| D44 | 2026-11-17 | agent | Every Suite command runs in its own process group; SIGINT is ignored while mutaspec stops processes and runs `teardown`. | Ctrl-C reaches only mutaspec, and a second Ctrl-C cannot skip `teardown`. | plan 0002 |
+| D44 | 2026-11-17 | agent | Every Suite command runs in its own process group; SIGINT is ignored while mutaspec stops processes and runs `teardown`. Superseded in part by D48. | Ctrl-C reaches only mutaspec, and a second Ctrl-C cannot skip `teardown`. | plan 0002 |
 | D45 | 2026-11-17 | agent | v0.1 runs Suites on POSIX systems only (macOS, Linux). | Process groups need `os.killpg`. Windows later, if asked. | plan 0002 |
 | D46 | 2026-11-17 | agent | mutaspec writes a `.gitignore` of `*` into each output folder it makes (`.mutaspec/worktrees/`, `.mutaspec/runs/`). | Keeps the user's `git status` unchanged (AC15) also when `init` did not write `.mutaspec/.gitignore`. Rejected: require `init` first (fails on hand-written configs); edit `.git/info/exclude` (changes the user's repository settings). | plan 0002 |
+| D47 | 2026-11-17 | agent | `--include-uncommitted` is allowed when the `baseline` ref points to the same commit as HEAD (for example `main` while on main), not only for the literal `HEAD`. | Uncommitted changes sit on HEAD; the name of the ref does not matter. Rejected: compare the text `HEAD` (refuses a correct setup). Found by the verifier. | plan 0002 |
+| D48 | 2026-11-17 | agent | A Ctrl-C while mutaspec stops processes or runs `teardown` is saved and takes effect when that ends; it is never dropped. Replaces "SIGINT is ignored" in D44. | Ignoring it dropped a first Ctrl-C that came while a finished command was stopped (verifier, SC3). | plan 0002 |
 
 ## Open (not yet decided)
 - Should `init` also detect Spring Boot 4 (`spring-boot-starter-webmvc`)? Raised 2026-11-12 after building 0001.

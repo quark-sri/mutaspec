@@ -55,17 +55,37 @@ def spawn(command: str, cwd: Path, log: Path) -> subprocess.Popen:
         )
 
 
+_guard = threading.local()
+
+
 @contextlib.contextmanager
 def no_interrupts() -> Iterator[None]:
-    """D44: a second Ctrl-C must not stop mutaspec while it stops processes or runs teardown."""
+    """D44: Ctrl-C waits until stopping processes or `teardown` ends, then takes effect.
+
+    A Ctrl-C that arrives inside the block is saved, not dropped: when the outermost
+    block ends, KeyboardInterrupt is raised as if Ctrl-C came just then.
+    """
     if threading.current_thread() is not threading.main_thread():
         yield
         return
-    old = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    depth = getattr(_guard, "depth", 0)
+    if depth == 0:
+        _guard.pending = False
+        _guard.old = signal.signal(signal.SIGINT, _save_interrupt)
+    _guard.depth = depth + 1
     try:
         yield
     finally:
-        signal.signal(signal.SIGINT, old)
+        _guard.depth = depth
+        if depth == 0:
+            signal.signal(signal.SIGINT, _guard.old)
+            if _guard.pending:
+                _guard.pending = False
+                raise KeyboardInterrupt
+
+
+def _save_interrupt(signum: int, frame: object) -> None:
+    _guard.pending = True
 
 
 def _group_alive(proc: subprocess.Popen) -> bool:

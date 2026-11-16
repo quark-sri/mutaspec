@@ -1,9 +1,12 @@
 """Suite commands in their own process group (spec 0002 FR3, FR9, FR10, AC13, AC14; D44)."""
 
 import os
+import signal
 import socket
 import sys
 import time
+
+import pytest
 
 from mutaspec import process
 
@@ -115,11 +118,42 @@ def test_fr9_tail_of_a_missing_log_is_empty(tmp_path):
     assert process.tail(tmp_path / "none.log") == ""
 
 
-def test_d44_ctrl_c_while_stopping_is_ignored(tmp_path):
-    import signal
-
-    with process.no_interrupts():
-        os.kill(os.getpid(), signal.SIGINT)  # would raise KeyboardInterrupt outside
+def test_d44_ctrl_c_while_stopping_waits_until_the_stop_ends(tmp_path):
+    reached_end_of_block = False
+    with pytest.raises(KeyboardInterrupt), process.no_interrupts():
+        os.kill(os.getpid(), signal.SIGINT)  # cleanup must go on
         time.sleep(0.1)
+        reached_end_of_block = True
 
+    assert reached_end_of_block
     assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+
+
+def test_d44_nested_blocks_raise_ctrl_c_once_after_the_outer_block(tmp_path):
+    steps = []
+    with pytest.raises(KeyboardInterrupt), process.no_interrupts():
+        with process.no_interrupts():
+            os.kill(os.getpid(), signal.SIGINT)
+            time.sleep(0.1)
+            steps.append("inner")
+        steps.append("outer")
+
+    assert steps == ["inner", "outer"]
+
+
+def test_ac12_ctrl_c_during_a_normal_stop_is_not_lost(tmp_path, monkeypatch):
+    real_alive = process._group_alive
+    sent = []
+
+    def alive_then_ctrl_c(proc):
+        if not sent:  # first check inside stop(), after the command ended
+            sent.append(1)
+            os.kill(os.getpid(), signal.SIGINT)
+            time.sleep(0.05)
+        return real_alive(proc)
+
+    monkeypatch.setattr(process, "_group_alive", alive_then_ctrl_c)
+
+    with pytest.raises(KeyboardInterrupt):
+        process.run("true", tmp_path, tmp_path / "x.log")
+    assert sent

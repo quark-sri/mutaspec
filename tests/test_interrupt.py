@@ -118,3 +118,15 @@ def test_sc3_twenty_runs_with_ctrl_c_and_ready_timeouts_leave_nothing_behind(
         pids += started_pids(work / "pids")
 
     assert all_gone(pids)
+
+
+def test_ac12_teardown_runs_for_every_suite_that_started(make_project, tmp_path):
+    first = suite("unit", tool("exit", 0), teardown=tool("record", tmp_path / "teardown", "unit"))
+    root = make_project(first, service(tmp_path, "in_run"))
+    proc = start_mutaspec(root)
+
+    code = interrupt_or_wait(proc, tmp_path, "in_run")
+
+    assert code == INTERRUPTED
+    done = [line.split()[0] for line in (tmp_path / "teardown").read_text().splitlines()]
+    assert done == ["unit", "teardown"]  # the unit Suite's, then the interrupted api Suite's

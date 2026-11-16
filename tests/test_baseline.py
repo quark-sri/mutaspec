@@ -96,6 +96,16 @@ def test_ac4_json_is_one_object_with_the_baseline_json_shape(make_project, run_c
     assert {"status", "durations", "reason"} <= set(data["suites"][0])
 
 
+def test_ac4_json_has_per_test_status_for_junit_suites(make_project, run_cli, tmp_path):
+    root = make_project(
+        suite("unit", tool("junit", tmp_path / "n", "a=pp", "b=ff"), junit=JUNIT),
+    )
+
+    data = run_cli(root, "baseline", "--json").json()
+
+    assert data["suites"][0]["tests"] == {"shop.T#a": "pass", "shop.T#b": "failing"}
+
+
 def test_ac4_json_when_ready(make_project, run_cli):
     root = make_project(suite("unit", tool("exit", 0)))
 
@@ -476,6 +486,21 @@ def test_edge_start_exits_before_ready_is_broken(make_project, run_cli, tmp_path
 
     assert out.code == ENVIRONMENT
     assert result(root)["suites"][0]["reason"] == "service stopped before it was ready"
+    assert "$ " in out.out  # the output tail of the start log is shown
+
+
+def test_ac15_start_and_ready_run_in_the_worktree(make_project, run_cli, tmp_path):
+    cwd_log = tmp_path / "cwd"
+    start = f"{tool('record', cwd_log, 'start')}; {tool('serve', tmp_path / 'pids', '{port}')}"
+    ready = f"{tool('record', cwd_log, 'ready')}; {tool('probe', '{port}')}"
+    root = make_project(service_suite(tmp_path, tool("exit", 0), start=start, ready=ready))
+
+    run_cli(root, "baseline")
+
+    base = str((root / ".mutaspec/worktrees/base").resolve())
+    lines = cwd_log.read_text().splitlines()
+    assert {line.split()[0] for line in lines} == {"start", "ready"}
+    assert all(line.split(" ", 1)[1] == base for line in lines)
 
 
 def test_d38_duration_covers_start_to_stop(make_project, run_cli, tmp_path):
