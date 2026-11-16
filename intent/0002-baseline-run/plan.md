@@ -37,7 +37,7 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 6. [x] `junit` in the baseline: AC5, AC6, AC8, edges "junit matches no files" and "no test passes", D29 old XML. SC2 (10 runs, both names reported every time).
 7. [x] Services: `start`/`ready`/stop/`teardown`, `{port}`. Tests: AC10, AC11, AC13, AC14 (end to end), edge "start exits before ready".
 8. [x] Ctrl-C: subprocess `python -m mutaspec baseline`, SIGINT to its pid. Tests: AC12 (exit 130, start pid and child pid dead, teardown marker written, no `baseline.json`), AC15 after Ctrl-C, SC3 (20 runs mixing Ctrl-C and ready timeouts; `ready_timeout = "1s"`, grace patched down).
-9. [ ] `init` writes `junit`; update the golden file. Tests: AC19, the existing SC1 golden test. Manual: `uv run mutaspec baseline` in `examples/shop` says "ready" (SC1 time check). Update the AGENTS.md demo line. Then the verifier; then `intent/README.md` → done.
+9. [x] `init` writes `junit`; update the golden file. Tests: AC19, the existing SC1 golden test (its expected config gains `junit`, per FR11). Manual: `uv run mutaspec baseline` in `examples/shop` says "ready" (SC1 time check). Update the AGENTS.md demo line. Then the verifier; then `intent/README.md` → done.
 
 ## Risks
 - **Nested worktree in `examples/shop`**: the base worktree holds a full copy of the mutaspec repo under `examples/shop/.mutaspec/worktrees/base`. It is git-ignored by `.mutaspec/.gitignore`. Check that pytest/ruff in the repo root do not collect it (add `.mutaspec` to ruff `extend-exclude` and pytest `norecursedirs` if needed).
@@ -53,3 +53,8 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 - `tests/test_config.py::test_ac9_…`, `tests/test_init.py::test_ac19_…`, `tests/test_cli.py::test_sc1_…` (golden): AC9, AC19, FR11.
 - Demo: in `examples/shop`, `uv run mutaspec init --force && uv run mutaspec config check && uv run mutaspec baseline` prints "ready" with durations for `unit` and `api`, exits 0, takes at most 2 × one plain run + 60 s (SC1), and `git status` stays clean.
 - Checks: `uv run ruff check . && uv run ruff format --check . && uv run pytest`; then the `verifier` subagent.
+
+## Results (2026-11-17)
+- Demo on `examples/shop` (Java 25, Maven 3.10): "ready" in 21 s overall; unit runs 5.6 s and 2.7 s, api runs 4.2 s and 4.3 s; 5 unit and 4 api tests `pass`; `git status` unchanged. SC1 holds (limit: 2 × one plain run + 60 s).
+- AC8 by hand: a compile error in a copy of the shop makes `unit` broken ("exited with code 1, but its JUnit XML shows no failed test") and `api` broken ("setup failed").
+- Departure: D46 (output folders hold a `.gitignore` of `*`), found in step 2 when AC15 failed without `init`.
