@@ -144,7 +144,17 @@ def test_load_defaults(git_repo):
     assert config.project.baseline == "HEAD"
     assert config.project.exclude == ()
     assert config.suites[1].timeout == 300
-    assert config.suites[0].repeat == 1
+    assert config.suites[0].repeat == 2
+
+
+def test_ac9_repeat_defaults_to_2_and_keeps_a_set_value(git_repo):
+    text = VALID.replace('name = "unit"', 'name = "unit"\nrepeat = 3', 1)
+    write(git_repo, "mutaspec.toml", text)
+
+    config = load(git_repo)
+
+    assert config.suites[0].repeat == 3
+    assert config.suites[1].repeat == 2
 
 
 def test_load_wrong_type_names_field(git_repo):
