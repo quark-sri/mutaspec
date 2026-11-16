@@ -10,7 +10,9 @@ import os
 import signal
 import socket
 import subprocess
+import threading
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -53,6 +55,19 @@ def spawn(command: str, cwd: Path, log: Path) -> subprocess.Popen:
         )
 
 
+@contextlib.contextmanager
+def no_interrupts() -> Iterator[None]:
+    """D44: a second Ctrl-C must not stop mutaspec while it stops processes or runs teardown."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    old = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGINT, old)
+
+
 def _group_alive(proc: subprocess.Popen) -> bool:
     proc.poll()  # reap the leader, so a finished leader does not count
     try:
@@ -71,14 +86,15 @@ def _signal_group(proc: subprocess.Popen, sig: int) -> None:
 
 def stop(proc: subprocess.Popen) -> None:
     """Stop the process group: SIGTERM, then SIGKILL after STOP_GRACE seconds (FR3)."""
-    if _group_alive(proc):
-        _signal_group(proc, signal.SIGTERM)
-        deadline = time.monotonic() + STOP_GRACE
-        while _group_alive(proc) and time.monotonic() < deadline:
-            time.sleep(0.05)
+    with no_interrupts():
         if _group_alive(proc):
-            _signal_group(proc, signal.SIGKILL)
-    proc.wait()
+            _signal_group(proc, signal.SIGTERM)
+            deadline = time.monotonic() + STOP_GRACE
+            while _group_alive(proc) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            if _group_alive(proc):
+                _signal_group(proc, signal.SIGKILL)
+        proc.wait()
 
 
 def run(command: str, cwd: Path, log: Path, timeout: float | None = None) -> Finished:

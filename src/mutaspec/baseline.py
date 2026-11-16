@@ -4,13 +4,9 @@ The Baseline result says "ready" or "not ready", each Suite `ok` or `broken` wit
 and is written to `.mutaspec/runs/baseline.json` for later intents (FR8).
 """
 
-import contextlib
 import json
 import shutil
-import signal
-import threading
 import time
-from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -69,19 +65,6 @@ def seconds(value: float) -> str:
     return f"{value:g}s"
 
 
-@contextlib.contextmanager
-def no_interrupts() -> Iterator[None]:
-    """D44: a second Ctrl-C must not skip stopping processes or `teardown`."""
-    if threading.current_thread() is not threading.main_thread():
-        yield
-        return
-    old = signal.signal(signal.SIGINT, signal.SIG_IGN)
-    try:
-        yield
-    finally:
-        signal.signal(signal.SIGINT, old)
-
-
 class _SuiteRun:
     """FR3: setup once, then each repeat, then teardown (always)."""
 
@@ -108,7 +91,7 @@ class _SuiteRun:
                     self._repeat(n)
                 self._judge()
             finally:
-                with no_interrupts():
+                with process.no_interrupts():
                     self._teardown()
         except _Broken as broken:
             self.result.status = BROKEN
@@ -143,8 +126,7 @@ class _SuiteRun:
             done = process.run(run, self.cwd, log, timeout=suite.timeout)
         finally:
             if service is not None:
-                with no_interrupts():
-                    process.stop(service)  # AC11
+                process.stop(service)  # AC11
             self.result.durations.append(time.monotonic() - started)
         if done.timed_out:
             raise _Broken(f"took longer than {seconds(suite.timeout or 0)}", log)

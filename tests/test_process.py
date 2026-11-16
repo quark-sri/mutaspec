@@ -113,3 +113,13 @@ def test_fr9_tail_shows_the_last_20_lines(tmp_path):
 
 def test_fr9_tail_of_a_missing_log_is_empty(tmp_path):
     assert process.tail(tmp_path / "none.log") == ""
+
+
+def test_d44_ctrl_c_while_stopping_is_ignored(tmp_path):
+    import signal
+
+    with process.no_interrupts():
+        os.kill(os.getpid(), signal.SIGINT)  # would raise KeyboardInterrupt outside
+        time.sleep(0.1)
+
+    assert signal.getsignal(signal.SIGINT) is signal.default_int_handler

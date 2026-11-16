@@ -29,3 +29,4 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: takes more than 10 seconds; still part of the default run"]

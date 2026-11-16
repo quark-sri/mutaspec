@@ -24,7 +24,7 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 - `src/mutaspec/cli.py`: `baseline [--include-uncommitted] [--json]`, the exit code taken from `Output`, `KeyboardInterrupt` → 130.
 - `src/mutaspec/scaffold.py` + `examples/shop/mutaspec.toml`: the `junit` line in each Maven Suite (FR11).
 - `tests/conftest.py`: `suite_repo` fixture (a git repo with a committed `mutaspec.toml` whose Suites call small Python scripts through `sys.executable`), and helpers to write JUnit XML and count runs in a counter file under `tmp_path`.
-- `tests/test_baseline.py`, `tests/test_worktree.py`, `tests/test_junit.py`, `tests/test_process.py` (new). Update `tests/test_config.py::test_load_defaults` (repeat 2) and `tests/test_init.py` (AC19).
+- `tests/test_baseline.py`, `tests/test_interrupt.py`, `tests/test_worktree.py`, `tests/test_junit.py`, `tests/test_process.py`, `tests/suite_tool.py` (a stand-in for test commands) (new). `pyproject.toml`: register the `slow` marker. Update `tests/test_config.py::test_load_defaults` (repeat 2) and `tests/test_init.py` (AC19).
 - `AGENTS.md`: add `uv run mutaspec baseline` to the demo line (needs Java and Maven).
 - `intent/README.md`: 0002 → `done` after the verifier passes.
 
@@ -36,7 +36,7 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 5. [x] `baseline.py` + CLI, Suites without services: lifecycle without `start`, repeats, FR6 without `junit`, `baseline.json`, logs, text output, `--json`, exit codes. Tests: AC1, AC2, AC3, AC4, AC7, AC9 (end to end), edge "setup failed" (no repeats, teardown runs), edge "teardown fails".
 6. [x] `junit` in the baseline: AC5, AC6, AC8, edges "junit matches no files" and "no test passes", D29 old XML. SC2 (10 runs, both names reported every time).
 7. [x] Services: `start`/`ready`/stop/`teardown`, `{port}`. Tests: AC10, AC11, AC13, AC14 (end to end), edge "start exits before ready".
-8. [ ] Ctrl-C: subprocess `python -m mutaspec baseline`, SIGINT to its pid. Tests: AC12 (exit 130, start pid and child pid dead, teardown marker written, no `baseline.json`), AC15 after Ctrl-C, SC3 (20 runs mixing Ctrl-C and ready timeouts; `ready_timeout = "1s"`, grace patched down).
+8. [x] Ctrl-C: subprocess `python -m mutaspec baseline`, SIGINT to its pid. Tests: AC12 (exit 130, start pid and child pid dead, teardown marker written, no `baseline.json`), AC15 after Ctrl-C, SC3 (20 runs mixing Ctrl-C and ready timeouts; `ready_timeout = "1s"`, grace patched down).
 9. [ ] `init` writes `junit`; update the golden file. Tests: AC19, the existing SC1 golden test. Manual: `uv run mutaspec baseline` in `examples/shop` says "ready" (SC1 time check). Update the AGENTS.md demo line. Then the verifier; then `intent/README.md` → done.
 
 ## Risks
