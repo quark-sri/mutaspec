@@ -39,3 +39,4 @@ Prompt: *"Read AGENTS.md and intent/0000-mutaspec/intent.md. Interview me one sh
 - One feature folder per branch and PR. Start each stage in a fresh session (`/clear`).
 - Build v0.1 thin first (0001–0004) so a real score comes out of `examples/shop` early, then deepen.
 - Every problem found later (bug, bad suggestion, slow run) becomes a new intent or an eval.
+- Every decision taken with the owner gets a row in [decisions.md](decisions.md), in the same commit as the document it changes.
