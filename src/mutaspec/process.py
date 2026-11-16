@@ -65,10 +65,14 @@ def no_interrupts() -> Iterator[None]:
     A Ctrl-C that arrives inside the block is saved, not dropped: when the outermost
     block ends, KeyboardInterrupt is raised as if Ctrl-C came just then.
     """
-    if threading.current_thread() is not threading.main_thread():
+    depth = getattr(_guard, "depth", 0)
+    main = threading.current_thread() is threading.main_thread()
+    # Leave an ignored or custom SIGINT handler (nohup, a host program) as it is.
+    if not main or (
+        depth == 0 and signal.getsignal(signal.SIGINT) is not signal.default_int_handler
+    ):
         yield
         return
-    depth = getattr(_guard, "depth", 0)
     if depth == 0:
         _guard.pending = False
         _guard.old = signal.signal(signal.SIGINT, _save_interrupt)

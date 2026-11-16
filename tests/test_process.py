@@ -157,3 +157,14 @@ def test_ac12_ctrl_c_during_a_normal_stop_is_not_lost(tmp_path, monkeypatch):
     with pytest.raises(KeyboardInterrupt):
         process.run("true", tmp_path, tmp_path / "x.log")
     assert sent
+
+
+def test_d48_an_ignored_or_custom_sigint_is_left_alone():
+    old = signal.signal(signal.SIGINT, signal.SIG_IGN)  # as under nohup
+    try:
+        with process.no_interrupts():
+            os.kill(os.getpid(), signal.SIGINT)
+            time.sleep(0.1)
+        assert signal.getsignal(signal.SIGINT) is signal.SIG_IGN
+    finally:
+        signal.signal(signal.SIGINT, old)
