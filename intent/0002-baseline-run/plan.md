@@ -31,7 +31,7 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 ## Order of work (one commit each; test first; checks pass before each commit)
 1. [x] `repeat` default 2. Test: AC9 (default 2; `repeat = 3` is kept).
 2. [x] `worktree.py`: create the base worktree (also in a subfolder project), recreate it, bad ref, uncommitted warning list (first 10 + "and N more"), `--include-uncommitted` copy, non-HEAD error. Tests: AC15 (git state of the user tree), AC16, AC17, AC18, edge "bad ref", edge "worktree exists".
-3. [ ] `process.py`: process groups, timeout, stop with grace, free port, log tail. Tests: AC14 (unit level), a child process is killed with its group, `free_port` can be bound.
+3. [x] `process.py`: process groups, timeout, stop with grace, free port, log tail. Tests: AC14 (unit level), a child process is killed with its group, `free_port` can be bound.
 4. [ ] `junit.py`: parse Surefire XML (failure, error, skipped), clear old files, combine runs. Tests: FR5 table, AC5/AC6 at unit level.
 5. [ ] `baseline.py` + CLI, Suites without services: lifecycle without `start`, repeats, FR6 without `junit`, `baseline.json`, logs, text output, `--json`, exit codes. Tests: AC1, AC2, AC3, AC4, AC7, AC9 (end to end), edge "setup failed" (no repeats, teardown runs), edge "teardown fails".
 6. [ ] `junit` in the baseline: AC5, AC6, AC8, edges "junit matches no files" and "no test passes", D29 old XML. SC2 (10 runs, both names reported every time).
