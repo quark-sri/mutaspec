@@ -3,6 +3,8 @@
 | Term | Meaning | _Avoid_ |
 |---|---|---|
 | **Baseline** | The clean code under test: a git ref (default `HEAD`) with no Mutant applied. | original, control |
+| **Baseline result** | The outcome of running every Suite on the Baseline, `repeat` times: "ready" or "not ready", each Suite `ok` or `broken`, each test `pass`, `failing` or `flaky`, and durations. Stored in `.mutaspec/runs/baseline.json`. | baseline report, dry run |
+| **Flaky test** | A test that both passes and fails on the same Baseline. Excluded from deciding Killed. | unstable test, random failure |
 | **Mutant** | One injected bug, stored as a git patch that changes source files only. Has a stable id. | fault, defect, mutation (for the object) |
 | **Mutant Set** | The frozen list of Mutants for a project, stored in `.mutaspec/mutants/`. Reused across Rounds. | bug list |
 | **Rule Mutant** | A Mutant made by a mutation operator (for example `<` to `<=`). | |

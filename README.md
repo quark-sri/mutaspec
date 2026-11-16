@@ -98,6 +98,7 @@ Java and Spring Boot come first. Python and TypeScript follow. The full plan and
 | [Plan](docs/PLAN.md) | Goal, users, workflow, architecture, roadmap and risks |
 | [Process](docs/process.md) | How each feature goes from intent to code |
 | [Research](docs/research.md) | Existing tools and what mutaspec learns from them |
+| [Decision ledger](docs/decisions.md) | Every decision taken with the owner, with the reason |
 | [Decisions](docs/adr/) | Architecture decision records |
 | [Intents](intent/) | One folder for each planned feature |
 | [Glossary](GLOSSARY.md) | The terms that mutaspec uses |
