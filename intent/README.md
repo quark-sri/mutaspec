@@ -14,7 +14,7 @@ The playbook gives no spec.md template; ours follows [GitHub spec-kit](https://g
 |---|---|---|---|---|---|
 | 0000 | [mutaspec (product)](0000-mutaspec/intent.md) | all | approved | — | — |
 | 0001 | [Project config and CLI](0001-project-config-and-cli/) | v0.1 | done | done | done |
-| 0002 | [Baseline run](0002-baseline-run/) | v0.1 | draft | pre-draft | — |
+| 0002 | [Baseline run](0002-baseline-run/) | v0.1 | approved | approved | approved |
 | 0003 | [Bug injection](0003-bug-injection/) | v0.1 / v0.2 | approved | pre-draft | — |
 | 0004 | [Mutant run and score](0004-mutant-run-and-score/) | v0.1 | draft | pre-draft | — |
 | 0005 | [Scope and budget](0005-scope-and-budget/) | v0.3 | draft | pre-draft | — |

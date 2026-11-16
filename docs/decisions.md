@@ -43,6 +43,15 @@ Hard-to-reverse decisions also get an ADR in [adr/](adr/); intents and specs rec
 | D34 | 2026-11-16 | agent | New glossary terms: **Baseline result**, **Flaky test**. | Used in code and reports from 0002 on. | GLOSSARY.md |
 | D35 | 2026-11-16 | agent | Success criterion SC1 is "at most `repeat` × one plain run + 60s", not "under 2× the normal test time". | With 2 repeats plus app start-up, the old target could not be met. | spec 0002 SC1 |
 | D36 | 2026-11-16 | agent | Spring Boot 4 detection stays open and out of scope for 0002. | Not part of the baseline; decide with the owner in a small fix or with 0003. | spec 0002 out of scope |
+| D37 | 2026-11-17 | agent | When the project root is a subfolder of the git repo, Suites run in the same subfolder of the worktree. | Applies spec 0002 FR2 to D14; `examples/shop` is such a subfolder. Rejected: run at the worktree top (wrong folder). | plan 0002 |
+| D38 | 2026-11-17 | agent | A Suite's duration is the wall time of one repeat, from `start` to stop (or of `run` alone when there is no `start`). | A Mutant run costs the same; 0005 plans with it. Rejected: `run` time only (hides app start-up). | plan 0002 |
+| D39 | 2026-11-17 | agent | "Not ready" with `--json` prints `ok: false`, `exit_code: 3`, `ready: false` and the Suites, with no `error` object. | It is a result, not a usage error. | plan 0002 |
+| D40 | 2026-11-17 | agent | An old `baseline.json` is deleted when a baseline starts; a run stopped by Ctrl-C writes none. | 0004 must never read an old "ready". | plan 0002 |
+| D41 | 2026-11-17 | agent | Only the literal text `{port}` is replaced in Suite commands; other braces are left as they are. | Shell `${VAR}` must keep working. | plan 0002 |
+| D42 | 2026-11-17 | agent | A Suite with no `timeout` has no time limit. | `init` always writes one; the user may remove it on purpose. | plan 0002 |
+| D43 | 2026-11-17 | agent | The uncommitted-files warning and `--include-uncommitted` cover only files under the project root. | Same scope as `git ls-files` in spec 0001. | plan 0002 |
+| D44 | 2026-11-17 | agent | Every Suite command runs in its own process group; SIGINT is ignored while mutaspec stops processes and runs `teardown`. | Ctrl-C reaches only mutaspec, and a second Ctrl-C cannot skip `teardown`. | plan 0002 |
+| D45 | 2026-11-17 | agent | v0.1 runs Suites on POSIX systems only (macOS, Linux). | Process groups need `os.killpg`. Windows later, if asked. | plan 0002 |
 
 ## Open (not yet decided)
 - Should `init` also detect Spring Boot 4 (`spring-boot-starter-webmvc`)? Raised 2026-11-12 after building 0001.
