@@ -1,4 +1,4 @@
-"""Command line: `init`, `config check`, `baseline`. Every command takes --json (spec 0001 AC12)."""
+"""Command line: `init`, `config check`, `baseline`, `run`. Every command takes --json."""
 
 import argparse
 import json
@@ -6,7 +6,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from mutaspec import __version__, baseline, gitrepo, scaffold
+from mutaspec import __version__, baseline, gitrepo, runner, scaffold
 from mutaspec.config import CONFIG_FILE, load
 from mutaspec.errors import OK, USAGE, MutaspecError
 
@@ -47,6 +47,22 @@ def _parser() -> argparse.ArgumentParser:
     )
     base.add_argument("--json", action="store_true", help="print one JSON object on stdout")
     base.set_defaults(handler=_baseline)
+
+    run = sub.add_parser("run", help="check the Baseline, then run and score the Mutants")
+    run.add_argument(
+        "--max",
+        type=int,
+        default=runner.DEFAULT_MAX,
+        metavar="N",
+        help=f"run at most N Mutants, picked the same way each time (default {runner.DEFAULT_MAX})",
+    )
+    run.add_argument(
+        "--include-uncommitted",
+        action="store_true",
+        help="also use uncommitted changes and new files (baseline must be HEAD)",
+    )
+    run.add_argument("--json", action="store_true", help="print one JSON object on stdout")
+    run.set_defaults(handler=_run)
     return parser
 
 
@@ -64,6 +80,13 @@ def _config_check(root: Path, args: argparse.Namespace) -> Output:
 
 def _baseline(root: Path, args: argparse.Namespace) -> Output:
     return baseline.run(load(root), include_uncommitted=args.include_uncommitted)
+
+
+def _run(root: Path, args: argparse.Namespace) -> Output:
+    if args.max < 1:
+        raise MutaspecError(USAGE, "--max must be 1 or more.", hint="Example: --max 20.")
+    say = (lambda _: None) if args.json else (lambda line: print(line, flush=True))
+    return runner.run(load(root), args.include_uncommitted, max_mutants=args.max, say=say)
 
 
 def main(argv: list[str] | None = None) -> int:
