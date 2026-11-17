@@ -22,7 +22,6 @@ class Project:
     tests: tuple[str, ...]
     baseline: str = "HEAD"
     exclude: tuple[str, ...] = ()
-    spec: tuple[str, ...] = ()
     build: str | None = None
 
 
@@ -39,7 +38,6 @@ class Suite:
     timeout: float | None = None
     junit: str | None = None
     repeat: int = 2
-    parallel: bool = False
 
 
 @dataclass(frozen=True)
@@ -111,7 +109,6 @@ def _project(table: Any) -> Project:
         tests=_globs(table, "tests", where, required=True),
         baseline=_str(table, "baseline", where) or "HEAD",
         exclude=_globs(table, "exclude", where),
-        spec=_globs(table, "spec", where),
         build=_str(table, "build", where),
     )
 
@@ -139,11 +136,6 @@ def _suite(table: Any, index: int) -> Suite:
             "must be a whole number of 1 or more.",
             "Example: repeat = 2.",
         )
-    parallel = table.get("parallel", False)
-    if not isinstance(parallel, bool):
-        raise _error(
-            f"{where}, field 'parallel'", "must be true or false.", "Write it without quotes."
-        )
 
     def duration(key: str) -> float | None:
         if key not in table:
@@ -162,7 +154,6 @@ def _suite(table: Any, index: int) -> Suite:
         timeout=duration("timeout"),
         junit=_str(table, "junit", where),
         repeat=repeat,
-        parallel=parallel,
     )
 
 

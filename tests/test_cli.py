@@ -63,7 +63,6 @@ SPEC_EXAMPLE = {
         "baseline": "HEAD",
         "source": ["src/main/java/**"],
         "tests": ["src/test/java/**"],
-        "spec": ["docs/**/*.md", "src/main/resources/openapi.yaml"],
         "build": "mvn -q -DskipTests test-compile",
     },
     "suites": [

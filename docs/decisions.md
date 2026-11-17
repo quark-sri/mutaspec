@@ -59,6 +59,7 @@ Hard-to-reverse decisions also get an ADR in [adr/](adr/); intents and specs rec
 | D50 | 2026-11-17 | agent | Rule Mutants come from text rules: an operator with a space on each side, or a boolean word, outside strings and comments; `+` is skipped on lines with text (string joins). | Works for Java, Python, JS and more with no parser. Rejected for now: tree-sitter (a dependency per language). | MVP |
 | D51 | 2026-11-17 | agent | A Mutant is written into the Baseline worktree and the original text is put back after it; the report shows it as a diff. | Same effect as applying a patch (ADR 0001), no `git apply` step. | MVP |
 | D52 | 2026-11-17 | agent | Suites run on a Mutant from the fastest to the slowest and stop at the first that catches it. Timeout and Killed count as caught; Invalid (build failed, Suite broke) is not scored. A Suite's limit on a Mutant is max(30 s, 3 × its Baseline duration), never above its own `timeout`. | Shortest run time; one overall score. Per-Level scores need every Suite on every Mutant: later. | MVP |
+| D53 | 2026-11-17 | agent | Remove the `spec` (requirement documents) and `parallel` config keys and the code that found requirement documents; `init` now points to `mutaspec run`. | Nothing reads them yet. They come back with Agent Mutants and parallel runs. | MVP |
 
 ## Open (not yet decided)
 - Should `init` also detect Spring Boot 4 (`spring-boot-starter-webmvc`)? Raised 2026-11-12 after building 0001.
