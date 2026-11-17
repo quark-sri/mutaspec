@@ -4,12 +4,12 @@ Plants bugs in a git worktree, runs the project's own test suites against the cl
 
 ## Commands
 - Checks before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`
-- Demo / golden fixture: in `examples/shop`, `uv run mutaspec init --force && uv run mutaspec config check && uv run mutaspec baseline` (baseline needs Java and Maven; it must say "ready"); `git status` must stay clean (the committed `mutaspec.toml` is the golden output). From v0.1: `uv run mutaspec run`; review the report diff on any output change.
+- Demos: in `examples/calc`, `uv run mutaspec run` (Python only, seconds; must score 60%). In `examples/shop`, `uv run mutaspec init --force && uv run mutaspec run --max 10` (needs Java and Maven, about a minute). `git status` must stay clean (the committed `examples/shop/mutaspec.toml` is the golden output of `init`).
 
 ## Conventions
-- Work follows [docs/process.md](docs/process.md): `intent.md` → `spec.md` → `plan.md` → tests → code, in `intent/NNNN-name/`. Do not write code for a feature whose spec.md is not `approved`.
+- Work follows [docs/process.md](docs/process.md): a short `intent/NNNN-name/spec.md` the owner says yes to, then tests, then code. Build the smallest thing people can use; no config keys, files or flags for future features.
 - Each acceptance criterion has a test named `test_acN_...`. Test first. If a test fails, fix the code, not the test.
-- If work departs from plan.md, update plan.md in the same commit. If the spec is wrong, stop and say so.
+- If the spec turns out wrong, change it in the same PR and say so.
 - Use GLOSSARY.md terms in code, docs and commits; never the _Avoid_ words.
 - Decisions that are hard to reverse go in `docs/adr/`.
 - Dependencies: permissive licences only (MIT, Apache-2.0, BSD). No GPL/AGPL.

@@ -76,7 +76,7 @@ def by_rule(data: dict) -> dict[str, str]:
     return {f"{m['line']} {m['rule']}": m["status"] for m in data["mutants"]}
 
 
-def test_each_mutant_is_killed_survived_or_timeout_and_scored(calc_repo, run_cli):
+def test_ac1_ac6_each_mutant_is_killed_survived_or_timeout_and_scored(calc_repo, run_cli):
     root = calc_repo()
 
     out = run_cli(root, "run", "--json")
@@ -95,7 +95,7 @@ def test_each_mutant_is_killed_survived_or_timeout_and_scored(calc_repo, run_cli
     assert killed["suite"] == "unit"
 
 
-def test_text_output_names_the_survived_mutant_and_writes_a_report(calc_repo, run_cli):
+def test_ac9_text_output_names_the_survived_mutant_and_writes_a_report(calc_repo, run_cli):
     root = calc_repo()
 
     out = run_cli(root, "run")
@@ -109,7 +109,7 @@ def test_text_output_names_the_survived_mutant_and_writes_a_report(calc_repo, ru
     assert "+    return age > 18" in report
 
 
-def test_the_users_files_and_git_state_do_not_change(calc_repo, run_cli):
+def test_ac8_the_users_files_and_git_state_do_not_change(calc_repo, run_cli):
     root = calc_repo()
     before = (git(root, "status", "--porcelain"), (root / "src/calc.py").read_text())
 
@@ -120,7 +120,7 @@ def test_the_users_files_and_git_state_do_not_change(calc_repo, run_cli):
     assert base.read_text() == CALC  # every Mutant was put back
 
 
-def test_max_limits_the_mutants(calc_repo, run_cli):
+def test_ac4_max_limits_the_mutants(calc_repo, run_cli):
     root = calc_repo()
 
     data = run_cli(root, "run", "--max", "2", "--json").json()
@@ -129,7 +129,7 @@ def test_max_limits_the_mutants(calc_repo, run_cli):
     assert data["found"] == 4
 
 
-def test_a_mutant_that_fails_build_is_invalid_and_not_scored(calc_repo, run_cli):
+def test_ac5_a_mutant_that_fails_build_is_invalid_and_not_scored(calc_repo, run_cli):
     root = calc_repo(project="build = \"! grep -q 'n + 1' src/calc.py\"")
 
     data = run_cli(root, "run", "--json").json()
@@ -139,7 +139,7 @@ def test_a_mutant_that_fails_build_is_invalid_and_not_scored(calc_repo, run_cli)
     assert "build failed" in next(m["reason"] for m in data["mutants"] if m["status"] == "invalid")
 
 
-def test_not_ready_baseline_stops_before_any_mutant(calc_repo, run_cli):
+def test_ac2_not_ready_baseline_stops_before_any_mutant(calc_repo, run_cli):
     root = calc_repo(run="exit 1")
 
     out = run_cli(root, "run")
@@ -155,14 +155,14 @@ def test_max_must_be_positive(calc_repo, run_cli):
     assert run_cli(root, "run", "--max", "0").code == 2
 
 
-def test_only_tests_that_passed_on_the_baseline_count_as_kills():
+def test_ac7_only_tests_that_passed_on_the_baseline_count_as_kills():
     before = {"T#ok": "pass", "T#flaky": "flaky", "T#broken": "failing"}
 
     assert runner.newly_failed(before, {"T#flaky": "failed", "T#broken": "failed"}) == []
     assert runner.newly_failed(before, {"T#ok": "failed", "T#new": "failed"}) == ["T#ok"]
 
 
-def test_score_counts_timeouts_as_caught_and_leaves_invalid_out():
+def test_ac1_score_counts_timeouts_as_caught_and_leaves_invalid_out():
     def o(status):
         return runner.Outcome(mutant=None, status=status)
 

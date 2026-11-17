@@ -8,17 +8,17 @@ Hard-to-reverse decisions also get an ADR in [adr/](adr/); intents and specs rec
 | ID | Date | By | Decision | Why / rejected options | Recorded in |
 |---|---|---|---|---|---|
 | D01 | ≤ 2026-11-09 | owner | Name `mutaspec`; Python CLI built with `uv`. | — | intent 0001 |
-| D02 | ≤ 2026-11-09 | owner | Hybrid bug sources: Rule Mutants (tree-sitter operators) + Agent Mutants (realistic, from code and requirements). | Rules alone miss realistic bugs; agents alone are not repeatable. | intent 0003 |
+| D02 | ≤ 2026-11-09 | owner | Hybrid bug sources: Rule Mutants (tree-sitter operators) + Agent Mutants (realistic, from code and requirements). Superseded in part by D50: Rule Mutants use text rules for now. | Rules alone miss realistic bugs; agents alone are not repeatable. | intent 0003 |
 | D03 | ≤ 2026-11-09 | owner | A Mutant is a git patch applied in a worktree; Suites are shell commands with setup/start/ready/teardown, so API and UI tests work. | — | [ADR 0001](adr/0001-mutants-are-patches-run-in-worktrees.md) |
 | D04 | ≤ 2026-11-09 | owner | The agent suggests tests and never edits the user's tests. | — | [ADR 0002](adr/0002-agent-suggests-tests-user-writes-them.md) |
 | D05 | ≤ 2026-11-09 | owner | The Mutant Set is committed and reused across Rounds. | Scores between Rounds must be comparable. | intent 0007 |
-| D06 | ≤ 2026-11-09 | owner | Report JSON uses the mutation-testing-elements schema, plus our own fields. | Existing viewers work. | spec 0004 |
-| D07 | ≤ 2026-11-09 | owner | Process: Anthropic AI-native SDLC playbook (`intent.md → spec.md → plan.md`); spec.md layout from GitHub spec-kit; no tasks.md (task list = plan.md "Order of work"). | Playbook gives no spec template. | [process.md](process.md) |
+| D06 | ≤ 2026-11-09 | owner | Report JSON uses the mutation-testing-elements schema, plus our own fields. Deferred by D49 (roadmap). | Existing viewers work. | spec 0004 |
+| D07 | ≤ 2026-11-09 | owner | Process: Anthropic AI-native SDLC playbook (`intent.md → spec.md → plan.md`); spec.md layout from GitHub spec-kit; no tasks.md (task list = plan.md "Order of work"). Superseded by D54. | Playbook gives no spec template. | [process.md](process.md) |
 | D08 | ≤ 2026-11-09 | owner | `.mutaspec/` writes its own `.gitignore` (worktrees and run output ignored; Mutant Set committable). Never edit the user's `.gitignore`. | — | intent 0001 |
 | D09 | ≤ 2026-11-09 | owner | The source/test rule is per file (works for Go/JS colocated tests). Rust inline `#[cfg(test)]` is a spec edge case. | — | intent 0001 |
 | D10 | ≤ 2026-11-09 | owner | One config file, `mutaspec.toml`, for every language; not inside `pyproject.toml` or `package.json`. | — | intent 0001 |
 | D11 | ≤ 2026-11-09 | owner | Use universalmutator only if its licence is permissive. Result: its LICENSE is Apache-2.0, so allowed. | Permissive licences only. | intent 0003, [research.md](research.md) |
-| D12 | 2026-11-10 | owner | v0.1 targets Java + Spring Boot (Maven, JUnit unit tests, REST API tests against the running app). Python rules move to v0.2; then TypeScript. | Reason in PLAN.md. | [PLAN.md](PLAN.md), intents 0000/0003/0010 |
+| D12 | 2026-11-10 | owner | v0.1 targets Java + Spring Boot (Maven, JUnit unit tests, REST API tests against the running app). Python rules move to v0.2; then TypeScript. Superseded in part by D50: the text rules also cover Python. | Reason in PLAN.md. | [PLAN.md](PLAN.md), intents 0000/0003/0010 |
 | D13 | 2026-11-11 | owner | API tests are marked with JUnit `@Tag("api")`; `mutaspec init` writes a unit Suite and an api Suite. | — | spec 0001 (PR #3) |
 | D14 | 2026-11-11 | owner | Project root = the folder where mutaspec runs (spec 0001 FR5 changed). | — | spec/plan 0001 (PR #4) |
 | D15 | 2026-11-16 | owner | Baseline uses committed code (the `baseline` ref) only. Uncommitted changes are used only when the user asks (`--include-uncommitted`); otherwise a warning lists them. | Rejected: never include (too strict); include by default (Baseline no longer a commit, Mutant Set may not match). | intent 0002 |
@@ -60,6 +60,7 @@ Hard-to-reverse decisions also get an ADR in [adr/](adr/); intents and specs rec
 | D51 | 2026-11-17 | agent | A Mutant is written into the Baseline worktree and the original text is put back after it; the report shows it as a diff. | Same effect as applying a patch (ADR 0001), no `git apply` step. | MVP |
 | D52 | 2026-11-17 | agent | Suites run on a Mutant from the fastest to the slowest and stop at the first that catches it. Timeout and Killed count as caught; Invalid (build failed, Suite broke) is not scored. A Suite's limit on a Mutant is max(30 s, 3 × its Baseline duration), never above its own `timeout`. | Shortest run time; one overall score. Per-Level scores need every Suite on every Mutant: later. | MVP |
 | D53 | 2026-11-17 | agent | Remove the `spec` (requirement documents) and `parallel` config keys and the code that found requirement documents; `init` now points to `mutaspec run`. | Nothing reads them yet. They come back with Agent Mutants and parallel runs. | MVP |
+| D54 | 2026-11-17 | owner | Lighter process: one short spec.md per feature (why, what the user sees, ACs, out of scope), then tests and code in one PR; plan.md and intent.md only when useful; the ledger only for owner decisions and decisions that are hard to reverse. The future intents 0003–0010 become a roadmap in docs/PLAN.md. | Three documents and three PRs per feature slowed delivery; after two features there was no score. | review 2026-11-17 |
 
 ## Open (not yet decided)
 - Should `init` also detect Spring Boot 4 (`spring-boot-starter-webmvc`)? Raised 2026-11-12 after building 0001.
