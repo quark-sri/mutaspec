@@ -39,6 +39,12 @@ def with_port(command: str, port: int | None) -> str:
     return command if port is None else command.replace("{port}", str(port))
 
 
+# Python keys its bytecode cache on the source's mtime in whole seconds and its size. A
+# Mutant often keeps the size and lands in the same second, so Python would run the
+# Baseline's bytecode. No cache, no stale code.
+SUITE_ENV = {"PYTHONDONTWRITEBYTECODE": "1"}
+
+
 def spawn(command: str, cwd: Path, log: Path) -> subprocess.Popen:
     """Start `command` in the background in a new process group; output goes to `log`."""
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -52,6 +58,7 @@ def spawn(command: str, cwd: Path, log: Path) -> subprocess.Popen:
             stdout=out,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            env={**os.environ, **SUITE_ENV},
         )
 
 

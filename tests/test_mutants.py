@@ -79,3 +79,29 @@ def test_missing_and_binary_files_are_skipped(tmp_path):
     (tmp_path / "b.bin").write_bytes(b"\xff\xfe a + b")
 
     assert mutants.find(tmp_path, ["b.bin", "gone.py"]) == []
+
+
+def all_rules(text: str) -> list[tuple[int, str]]:
+    return [(m.line, m.rule) for m in mutants.find_in_text("x", text)]
+
+
+def test_ac3_python_docstrings_are_not_changed():
+    text = 'def f(x, y):\n    """\n    True when x < y and z.\n    """\n    return x < y\n'
+    assert all_rules(text) == [(5, "< -> <=")]
+
+
+def test_ac3_block_comments_over_several_lines_are_not_changed():
+    text = "/*\n  total = a + b\n  if x < y\n*/\nint z = 1; /* a + b */ int w = c - d;\n"
+    assert all_rules(text) == [(5, "- -> +")]
+
+
+def test_ac3_java_text_blocks_and_js_templates_are_not_changed():
+    java = 'String s = """\n    a + b < c\n    """;\nint n = a * b;\n'
+    js = "const t = `\n  ${a} - ${b} > 1\n`;\nconst n = a * b;\n"
+    assert all_rules(java) == [(4, "* -> /")]
+    assert all_rules(js) == [(4, "* -> /")]
+
+
+def test_ac3_annotations_and_logging_over_several_lines_are_skipped():
+    text = "@Size(\n    max = 10 * 2)\nlog.info(\n    a - b,\n    c < d);\nint n = a * b;\n"
+    assert all_rules(text) == [(6, "* -> /")]

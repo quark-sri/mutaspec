@@ -28,10 +28,10 @@ Report: .mutaspec/runs/report.md
 ## Acceptance criteria
 - **AC1** Given a project whose Baseline is ready, When I run `mutaspec run`, Then each Mutant is Killed, Survived, Timeout or Invalid, and the score is (Killed + Timeout) / (Killed + Timeout + Survived).
 - **AC2** Given a Baseline that is not ready, Then no Mutant runs and the exit code is 3.
-- **AC3** Rule Mutants change one operator or boolean word in a `source` file, never in strings, comments, imports, annotations or logging lines, and never in `tests` files.
+- **AC3** Rule Mutants change one operator or boolean word in a `source` file, never in strings, comments (also over several lines: docstrings, block comments, text blocks), imports, annotations or logging statements, and never in `tests` files.
 - **AC4** `--max N` runs at most N Mutants, the same ones each time for the same code.
 - **AC5** A Mutant that fails `build` is Invalid and not scored.
-- **AC6** A Mutant that makes a Suite run longer than max(30 s, 3 × its Baseline duration) is Timeout.
+- **AC6** A Mutant that makes a Suite run longer than max(30 s, 3 × its Baseline duration), or longer than the Suite's own `timeout` if that is shorter, is Timeout.
 - **AC7** With `junit`, only tests that passed on every Baseline run count for Killed; flaky and failing tests never do.
 - **AC8** The user's files and git state do not change, and every Mutant is removed from the worktree after its run.
 - **AC9** The text output and `.mutaspec/runs/report.md` show each Survived Mutant as a diff; `--json` gives the same data.

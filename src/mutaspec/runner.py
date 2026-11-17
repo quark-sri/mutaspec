@@ -84,7 +84,12 @@ def _run_mutant(
         key=lambda pair: sum(pair[1].durations) / max(len(pair[1].durations), 1),
     )
     outcome = Outcome(mutant, SURVIVED)
-    original = mutants.apply(mutant, cwd)
+    try:
+        with process.no_interrupts():  # a Ctrl-C never leaves a half-written file
+            original = mutants.apply(mutant, cwd)
+    except ValueError as error:  # e.g. a build step rewrote the file
+        outcome.status, outcome.reason = INVALID, str(error)
+        return outcome
     try:
         if config.project.build:
             log = logs / "build.log"
@@ -99,7 +104,8 @@ def _run_mutant(
                 outcome.suite = suite.name if status != INVALID else None
                 break
     finally:
-        mutants.restore(mutant, cwd, original)
+        with process.no_interrupts():
+            mutants.restore(mutant, cwd, original)
     outcome.seconds = time.monotonic() - started
     return outcome
 

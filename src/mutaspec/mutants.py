@@ -6,8 +6,10 @@ that only import, annotate or log are skipped.
 """
 
 import hashlib
+import os
 import random
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,42 +63,67 @@ class Mutant:
         return {"id": self.id, "file": self.file, "line": self.line, "rule": self.rule}
 
 
-def _code_end_and_strings(line: str) -> tuple[int, set[int]]:
-    """Where a trailing comment starts, and the positions that are inside string literals."""
-    inside: set[int] = set()
-    quote = None
-    i = 0
-    while i < len(line):
-        ch = line[i]
-        if quote:
-            inside.add(i)
-            if ch == "\\":
-                inside.add(i + 1)
+def _scan(lines: list[str]) -> list[tuple[list[bool], bool]]:
+    """For each line: which positions are code (not string or comment), and whether the
+    line holds string text. Block comments and multi-line strings carry over lines."""
+    out = []
+    mode: str | None = None  # None, "block", or the quote that ends the string
+    for line in lines:
+        code = [False] * len(line)
+        has_text = mode not in (None, "block")
+        i = 0
+        while i < len(line):
+            if mode == "block":
+                end = line.find("*/", i)
+                if end < 0:
+                    break
+                i, mode = end + 2, None
+            elif mode is not None:
+                has_text = True
+                if line[i] == "\\":
+                    i += 2
+                elif line.startswith(mode, i):
+                    i, mode = i + len(mode), None
+                else:
+                    i += 1
+            elif line.startswith("//", i) or line[i] == "#":
+                break
+            elif line.startswith("/*", i):
+                i, mode = i + 2, "block"
+            elif line.startswith(('"""', "'''"), i):
+                i, mode, has_text = i + 3, line[i : i + 3], True
+            elif line[i] in "\"'`":
+                i, mode, has_text = i + 1, line[i], True
+            else:
+                code[i] = True
                 i += 1
-            elif ch == quote:
-                quote = None
-        elif ch in "\"'`":
-            quote = ch
-            inside.add(i)
-        elif line.startswith("//", i) or ch == "#":
-            return i, inside
-        i += 1
-    return len(line), inside
+        if mode in ('"', "'"):
+            mode = None  # these strings end with the line
+        out.append((code, has_text))
+    return out
 
 
-def _candidates(line: str) -> list[tuple[int, str]]:
+def _arid(line: str) -> bool:
     text = line.strip()
-    if not text or text.startswith(_SKIP_START) or _LOGGING.search(text):
-        return []
-    end, strings = _code_end_and_strings(line)
+    return not text or text.startswith(_SKIP_START) or bool(_LOGGING.search(text))
+
+
+def _depth(line: str, code: list[bool]) -> int:
+    """How many brackets the code on this line leaves open."""
+    return sum(
+        (ch in "([") - (ch in ")]") for ch, is_code in zip(line, code, strict=True) if is_code
+    )
+
+
+def _candidates(line: str, code: list[bool], has_text: bool) -> list[tuple[int, str]]:
     found = [(m.start(), m.group()) for m in _OPERATOR.finditer(line)]
     found += [(m.start(), m.group()) for m in _WORD.finditer(line)]
-    # '+' next to text joins strings ("a" + b); '-' does not compile there.
-    joins_text = bool(strings)
     return sorted(
         (col, old)
         for col, old in found
-        if col < end and col not in strings and not (old == "+" and joins_text)
+        if all(code[col : col + len(old)])
+        # '+' next to text joins strings ("a" + b); '-' does not compile there.
+        and not (old == "+" and has_text)
     )
 
 
@@ -133,9 +160,16 @@ def find(folder: Path, files: list[str]) -> list[Mutant]:
 
 
 def find_in_text(file: str, text: str) -> list[Mutant]:
+    lines = text.splitlines(keepends=True)
     found = []
-    for number, line in enumerate(text.splitlines(keepends=True), start=1):
-        found += [_make(file, number, line, col, old) for col, old in _candidates(line)]
+    open_arid = 0  # brackets still open in an import, annotation or logging statement
+    for number, (line, (code, has_text)) in enumerate(zip(lines, _scan(lines), strict=True), 1):
+        if open_arid > 0 or _arid(line):
+            open_arid = max(0, open_arid + _depth(line, code))
+            continue
+        found += [
+            _make(file, number, line, col, old) for col, old in _candidates(line, code, has_text)
+        ]
     return found
 
 
@@ -166,5 +200,9 @@ def restore(mutant: Mutant, folder: Path, original: str) -> None:
 
 
 def _write(path: Path, text: str) -> None:
+    """Write `text`; the file's mtime always moves forward, so build tools see the change."""
+    before = path.stat().st_mtime_ns
     with path.open("w", encoding="utf-8", newline="") as handle:
         handle.write(text)
+    stamp = max(time.time_ns(), before + 1)
+    os.utime(path, ns=(stamp, stamp))

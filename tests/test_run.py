@@ -40,6 +40,7 @@ class CalcTest(unittest.TestCase):
 
     def test_add(self):
         self.assertEqual(calc.add(2, 3), 5)
+        self.assertEqual(calc.add(1, 1), 1 + 1)  # a test file: never mutated
 
     def test_countdown(self):
         self.assertEqual(calc.countdown(3), 0)
@@ -90,6 +91,7 @@ def test_ac1_ac6_each_mutant_is_killed_survived_or_timeout_and_scored(calc_repo,
         "11 - -> +": "timeout",
     }
     assert data["score"] == 75.0
+    assert {m["file"] for m in data["mutants"]} == {"src/calc.py"}  # AC3: no test file
     assert (data["caught"], data["scored"], data["survived"]) == (3, 4, 1)
     killed = next(m for m in data["mutants"] if m["status"] == "killed")
     assert killed["suite"] == "unit"
@@ -171,3 +173,27 @@ def test_ac1_score_counts_timeouts_as_caught_and_leaves_invalid_out():
     s = runner.score(outcomes)
 
     assert (s["score"], s["caught"], s["scored"], s["invalid"]) == (70.0, 7, 10, 2)
+
+
+def test_ac1_python_never_runs_stale_bytecode_of_the_baseline(git_repo, run_cli):
+    # '+' -> '-' keeps the file size; written in the same second as the Baseline's
+    # .pyc, Python would reuse the old bytecode and the Mutant would survive.
+    write(git_repo, "src/m.py", "def f(a, b):\n    return a + b\n")
+    write(
+        git_repo,
+        "tests/test_m.py",
+        "import sys, unittest\nsys.path.insert(0, 'src')\nimport m\n\n\n"
+        "class T(unittest.TestCase):\n    def test_f(self):\n"
+        "        self.assertEqual(m.f(2, 3), 5)\n",
+    )
+    write(
+        git_repo,
+        "mutaspec.toml",
+        '[project]\nsource = ["src/**"]\ntests = ["tests/**"]\n\n'
+        f'[[suites]]\nname = "unit"\nlevel = "unit"\nrun = {json.dumps(UNITTEST)}\n',
+    )
+    commit_all(git_repo)
+
+    for _ in range(3):
+        data = run_cli(git_repo, "run", "--json").json()
+        assert [m["status"] for m in data["mutants"]] == ["killed"]
