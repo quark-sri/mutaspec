@@ -35,7 +35,7 @@ SWAPS = {
 }
 _OPERATOR = re.compile(r"(?<= )(<=|>=|==|!=|&&|\|\||and|or|<|>|\+|-|\*|/)(?= )")
 _WORD = re.compile(r"\b(true|false|True|False)\b")
-_SKIP_START = ("//", "#", "*", "/*", "import ", "from ", "package ", "@")
+_SKIP_START = ("//", "#", "*", "import ", "from ", "package ", "@")
 _LOGGING = re.compile(r"\b(log|logger|LOG|LOGGER|logging|print|console)\b|System\.(out|err)")
 
 

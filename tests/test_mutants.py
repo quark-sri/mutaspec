@@ -105,3 +105,7 @@ def test_ac3_java_text_blocks_and_js_templates_are_not_changed():
 def test_ac3_annotations_and_logging_over_several_lines_are_skipped():
     text = "@Size(\n    max = 10 * 2)\nlog.info(\n    a - b,\n    c < d);\nint n = a * b;\n"
     assert all_rules(text) == [(6, "* -> /")]
+
+
+def test_ac3_code_after_a_leading_block_comment_is_still_mutated():
+    assert all_rules("/* note */ int q = a + b;\n") == [(1, "+ -> -")]
