@@ -130,4 +130,11 @@ def create_base(config: Config, include_uncommitted: bool) -> Base:
     if include_uncommitted:
         _copy_uncommitted(root, project_dir, files)
         return Base(path, project_dir, ref, commit, uncommitted=True)
+    if not project_dir.is_dir():
+        raise MutaspecError(
+            USAGE,
+            f"this project folder is not in the baseline commit {commit[:7]} ({ref}).",
+            where=str(root),
+            hint="Commit it first, or run with --include-uncommitted.",
+        )
     return Base(path, project_dir, ref, commit, uncommitted=False, left_out=files)
