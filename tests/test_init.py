@@ -271,3 +271,28 @@ def test_edge_not_maven_writes_commented_template_and_says_so(git_repo, run_cli,
     text = (git_repo / "mutaspec.toml").read_text()
     assert "# [[suites]]" in text
     assert (git_repo / ".mutaspec/.gitignore").is_file()
+
+
+SUREFIRE = "**/target/surefire-reports/TEST-*.xml"
+
+
+def test_ac19_maven_suites_get_the_surefire_junit_glob(maven_repo, run_cli):
+    spring_repo(maven_repo, "spring-boot-starter-web", "spring-boot-starter-actuator")
+
+    run_cli(maven_repo, "init")
+
+    unit, api = read_config(maven_repo)["suites"]
+    assert unit["junit"] == SUREFIRE
+    assert api["junit"] == SUREFIRE
+
+
+def test_ac19_commented_multi_module_api_suite_has_junit_too(git_repo, run_cli):
+    write(git_repo, "pom.xml", PARENT_POM)
+    write(git_repo, "orders/pom.xml", POM.format(deps=""))
+    write(git_repo, "web/pom.xml", POM.format(deps=dep("spring-boot-starter-web")))
+    commit_all(git_repo)
+
+    run_cli(git_repo, "init")
+
+    assert read_config(git_repo)["suites"][0]["junit"] == SUREFIRE
+    assert f'# junit = "{SUREFIRE}"' in (git_repo / "mutaspec.toml").read_text()

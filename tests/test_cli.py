@@ -72,6 +72,7 @@ SPEC_EXAMPLE = {
             "level": "unit",
             "run": "mvn -q test -DexcludedGroups=api",
             "timeout": "300s",
+            "junit": "**/target/surefire-reports/TEST-*.xml",  # spec 0002 FR11
         },
         {
             "name": "api",
@@ -82,6 +83,7 @@ SPEC_EXAMPLE = {
             "ready_timeout": "60s",
             "run": "mvn -q test -Dgroups=api -DbaseUrl=http://localhost:{port}",
             "timeout": "300s",
+            "junit": "**/target/surefire-reports/TEST-*.xml",  # spec 0002 FR11
         },
     ],
 }

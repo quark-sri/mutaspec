@@ -38,7 +38,7 @@ class Suite:
     teardown: str | None = None
     timeout: float | None = None
     junit: str | None = None
-    repeat: int = 1
+    repeat: int = 2
     parallel: bool = False
 
 
@@ -132,7 +132,7 @@ def _suite(table: Any, index: int) -> Suite:
             f"Use one of: {', '.join(LEVELS)}.",
         )
 
-    repeat = table.get("repeat", 1)
+    repeat = table.get("repeat", 2)
     if not isinstance(repeat, int) or isinstance(repeat, bool) or repeat < 1:
         raise _error(
             f"{where}, field 'repeat'",

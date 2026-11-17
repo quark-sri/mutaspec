@@ -122,6 +122,10 @@ def detect(root: Path) -> Project:
     )
 
 
+# Per-test results from Maven Surefire, in every module (spec 0002 FR11, D28).
+JUNIT_LINE = 'junit = "**/target/surefire-reports/TEST-*.xml"  # per-test results'
+
+
 def _api_suite(project: Project) -> list[str]:
     mvn = project.mvn
     if project.actuator:
@@ -138,6 +142,7 @@ def _api_suite(project: Project) -> list[str]:
         'ready_timeout = "60s"',
         f"run = {_toml(f'{mvn} -q test -Dgroups=api -DbaseUrl=http://localhost:{{port}}')}",
         'timeout = "300s"',
+        JUNIT_LINE,
     ]
 
 
@@ -174,6 +179,7 @@ def _render_maven(project: Project) -> str:
         'level = "unit"',
         f"run = {_toml(f'{mvn} -q test -DexcludedGroups=api')}",
         'timeout = "300s"',
+        JUNIT_LINE,
     ]
     if project.web and project.modules:
         lines += [

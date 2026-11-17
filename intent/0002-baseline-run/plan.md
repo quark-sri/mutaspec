@@ -6,7 +6,7 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 - Still no runtime dependencies: `subprocess`, `os.killpg`, `signal`, `socket`, `xml.etree`, `pathlib.Path.glob`, `time.monotonic`.
 - **Project folder in the worktree (D37).** `git worktree add` checks out the whole repository. When the project root is a subfolder of the repo (as with `examples/shop`), Suites run in `<worktree>/<root relative to git toplevel>`. This applies FR2 to D14.
 - Every Suite command (`setup`, `start`, `ready`, `run`, `teardown`) runs through `sh -c` with `start_new_session=True`. That gives each one its own process group, which mutaspec stops as a whole: SIGTERM, then SIGKILL after `STOP_GRACE` (10 s; a module constant that tests can patch). Terminal Ctrl-C then reaches only mutaspec (D44).
-- Ctrl-C: `KeyboardInterrupt` passes through `try/finally` blocks that stop the groups and run `teardown`. SIGINT is ignored while cleanup runs, so a second Ctrl-C cannot skip `teardown`. `cli.main` maps the interrupt to exit 130.
+- Ctrl-C: `KeyboardInterrupt` passes through `try/finally` blocks that stop the groups and run `teardown`. A Ctrl-C during cleanup is saved and raised when cleanup ends, so a second Ctrl-C cannot skip `teardown` and no Ctrl-C is lost. `cli.main` maps the interrupt to exit 130.
 - `{port}`: only the literal text `{port}` is replaced. Other braces (shell `${VAR}`) are left as they are (D41).
 - A Suite with no `timeout` has no time limit (D42).
 - `durations[n]` = wall time of one repeat, from `start` to stop (from `run` to its end when there is no `start`). A Mutant run costs the same, and 0005 plans with this number (D38).
@@ -17,27 +17,27 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 
 ## Files that change
 - `src/mutaspec/config.py`: `repeat` default 1 → 2 (FR4).
-- `src/mutaspec/worktree.py` (new): git toplevel and the project's relative path, `create_base(config, include_uncommitted)` (remove/prune, then `worktree add --detach <ref>`), `uncommitted_files(root)`, copying files for AC17, a bad-ref error (exit 2), AC18 (exit 2).
+- `src/mutaspec/worktree.py` (new): output folders that git always ignores (D46), git toplevel and the project's relative path, `create_base(config, include_uncommitted)` (remove/prune, then `worktree add --detach <ref>`), `uncommitted_files(root)`, copying files for AC17, a bad-ref error (exit 2), AC18 (exit 2).
 - `src/mutaspec/process.py` (new): `free_port()`, `spawn(cmd, cwd, log)`, `run(cmd, cwd, log, timeout) -> (code, seconds, timed_out)`, `stop(proc)` (process group), `tail(log, 20)`.
 - `src/mutaspec/junit.py` (new): `read_results(folder, glob) -> dict[str, str]`, `clear(folder, glob)` (D29), `combine(runs) -> {id: pass|failing|flaky}`.
 - `src/mutaspec/baseline.py` (new): the Suite lifecycle (FR3), status rules (FR6, FR7), `BaselineResult` → `baseline.json` (FR8), logs at `.mutaspec/runs/baseline/<suite>-<n>.log`, `-setup.log`, `-teardown.log` (FR9), text lines.
 - `src/mutaspec/cli.py`: `baseline [--include-uncommitted] [--json]`, the exit code taken from `Output`, `KeyboardInterrupt` → 130.
 - `src/mutaspec/scaffold.py` + `examples/shop/mutaspec.toml`: the `junit` line in each Maven Suite (FR11).
 - `tests/conftest.py`: `suite_repo` fixture (a git repo with a committed `mutaspec.toml` whose Suites call small Python scripts through `sys.executable`), and helpers to write JUnit XML and count runs in a counter file under `tmp_path`.
-- `tests/test_baseline.py`, `tests/test_worktree.py`, `tests/test_junit.py`, `tests/test_process.py` (new). Update `tests/test_config.py::test_load_defaults` (repeat 2) and `tests/test_init.py` (AC19).
+- `tests/test_baseline.py`, `tests/test_interrupt.py`, `tests/test_worktree.py`, `tests/test_junit.py`, `tests/test_process.py`, `tests/suite_tool.py` (a stand-in for test commands) (new). `pyproject.toml`: register the `slow` marker. Update `tests/test_config.py::test_load_defaults` (repeat 2) and `tests/test_init.py` (AC19).
 - `AGENTS.md`: add `uv run mutaspec baseline` to the demo line (needs Java and Maven).
 - `intent/README.md`: 0002 → `done` after the verifier passes.
 
 ## Order of work (one commit each; test first; checks pass before each commit)
-1. [ ] `repeat` default 2. Test: AC9 (default 2; `repeat = 3` is kept).
-2. [ ] `worktree.py`: create the base worktree (also in a subfolder project), recreate it, bad ref, uncommitted warning list (first 10 + "and N more"), `--include-uncommitted` copy, non-HEAD error. Tests: AC15 (git state of the user tree), AC16, AC17, AC18, edge "bad ref", edge "worktree exists".
-3. [ ] `process.py`: process groups, timeout, stop with grace, free port, log tail. Tests: AC14 (unit level), a child process is killed with its group, `free_port` can be bound.
-4. [ ] `junit.py`: parse Surefire XML (failure, error, skipped), clear old files, combine runs. Tests: FR5 table, AC5/AC6 at unit level.
-5. [ ] `baseline.py` + CLI, Suites without services: lifecycle without `start`, repeats, FR6 without `junit`, `baseline.json`, logs, text output, `--json`, exit codes. Tests: AC1, AC2, AC3, AC4, AC7, AC9 (end to end), edge "setup failed" (no repeats, teardown runs), edge "teardown fails".
-6. [ ] `junit` in the baseline: AC5, AC6, AC8, edges "junit matches no files" and "no test passes", D29 old XML. SC2 (10 runs, both names reported every time).
-7. [ ] Services: `start`/`ready`/stop/`teardown`, `{port}`. Tests: AC10, AC11, AC13, AC14 (end to end), edge "start exits before ready".
-8. [ ] Ctrl-C: subprocess `python -m mutaspec baseline`, SIGINT to its pid. Tests: AC12 (exit 130, start pid and child pid dead, teardown marker written, no `baseline.json`), AC15 after Ctrl-C, SC3 (20 runs mixing Ctrl-C and ready timeouts; `ready_timeout = "1s"`, grace patched down).
-9. [ ] `init` writes `junit`; update the golden file. Tests: AC19, the existing SC1 golden test. Manual: `uv run mutaspec baseline` in `examples/shop` says "ready" (SC1 time check). Update the AGENTS.md demo line. Then the verifier; then `intent/README.md` → done.
+1. [x] `repeat` default 2. Test: AC9 (default 2; `repeat = 3` is kept).
+2. [x] `worktree.py`: create the base worktree (also in a subfolder project), recreate it, bad ref, uncommitted warning list (first 10 + "and N more"), `--include-uncommitted` copy, non-HEAD error. Tests: AC15 (git state of the user tree), AC16, AC17, AC18, edge "bad ref", edge "worktree exists".
+3. [x] `process.py`: process groups, timeout, stop with grace, free port, log tail. Tests: AC14 (unit level), a child process is killed with its group, `free_port` can be bound.
+4. [x] `junit.py`: parse Surefire XML (failure, error, skipped), clear old files, combine runs. Tests: FR5 table, AC5/AC6 at unit level.
+5. [x] `baseline.py` + CLI, Suites without services: lifecycle without `start`, repeats, FR6 without `junit`, `baseline.json`, logs, text output, `--json`, exit codes. Tests: AC1, AC2, AC3, AC4, AC7, AC9 (end to end), edge "setup failed" (no repeats, teardown runs), edge "teardown fails".
+6. [x] `junit` in the baseline: AC5, AC6, AC8, edges "junit matches no files" and "no test passes", D29 old XML. SC2 (10 runs, both names reported every time).
+7. [x] Services: `start`/`ready`/stop/`teardown`, `{port}`. Tests: AC10, AC11, AC13, AC14 (end to end), edge "start exits before ready".
+8. [x] Ctrl-C: subprocess `python -m mutaspec baseline`, SIGINT to its pid. Tests: AC12 (exit 130, start pid and child pid dead, teardown marker written, no `baseline.json`), AC15 after Ctrl-C, SC3 (20 runs mixing Ctrl-C and ready timeouts; `ready_timeout = "1s"`, grace patched down).
+9. [x] `init` writes `junit`; update the golden file. Tests: AC19, the existing SC1 golden test (its expected config gains `junit`, per FR11). Manual: `uv run mutaspec baseline` in `examples/shop` says "ready" (SC1 time check). Update the AGENTS.md demo line. Then the verifier; then `intent/README.md` → done.
 
 ## Risks
 - **Nested worktree in `examples/shop`**: the base worktree holds a full copy of the mutaspec repo under `examples/shop/.mutaspec/worktrees/base`. It is git-ignored by `.mutaspec/.gitignore`. Check that pytest/ruff in the repo root do not collect it (add `.mutaspec` to ruff `extend-exclude` and pytest `norecursedirs` if needed).
@@ -53,3 +53,10 @@ Status: approved (merging the PR is the approval). Decisions behind this plan: [
 - `tests/test_config.py::test_ac9_…`, `tests/test_init.py::test_ac19_…`, `tests/test_cli.py::test_sc1_…` (golden): AC9, AC19, FR11.
 - Demo: in `examples/shop`, `uv run mutaspec init --force && uv run mutaspec config check && uv run mutaspec baseline` prints "ready" with durations for `unit` and `api`, exits 0, takes at most 2 × one plain run + 60 s (SC1), and `git status` stays clean.
 - Checks: `uv run ruff check . && uv run ruff format --check . && uv run pytest`; then the `verifier` subagent.
+
+## Results (2026-11-17)
+- Demo on `examples/shop` (Java 25, Maven 3.10): "ready" in 21 s overall; unit runs 5.6 s and 2.7 s, api runs 4.2 s and 4.3 s; 5 unit and 4 api tests `pass`; `git status` unchanged. SC1 holds (limit: 2 × one plain run + 60 s).
+- AC8 by hand: a compile error in a copy of the shop makes `unit` broken ("exited with code 1, but its JUnit XML shows no failed test") and `api` broken ("setup failed").
+- Departure: D46 (output folders hold a `.gitignore` of `*`), found in step 2 when AC15 failed without `init`.
+- Verifier (2026-11-17), first run: fail. A Ctrl-C that came while a finished command was being stopped (after each `ready` check, about once a second) was dropped, so SC3 failed now and then. Fixed: `no_interrupts` saves the Ctrl-C and raises it after cleanup (D48 replaces part of D44). Added tests: Ctrl-C inside a stop, nested cleanup, AC12 with two Suites, AC15 for `start`/`ready`, tail shown when `start` stops early, `tests` in `--json`. D47 records the AC18 commit comparison. The Ctrl-C tests then passed 5 times in a row (100 SC3 rounds).
+- Verifier, second run: pass (144 tests; the Ctrl-C tests passed 5 times; the shop demo said "ready"). Its last low finding is fixed too: an ignored or custom SIGINT handler (for example under `nohup`) is left as it is.

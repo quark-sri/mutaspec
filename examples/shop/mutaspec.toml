@@ -12,6 +12,7 @@ name = "unit"
 level = "unit"
 run = "mvn -q test -DexcludedGroups=api"
 timeout = "300s"
+junit = "**/target/surefire-reports/TEST-*.xml"  # per-test results
 
 # REST API tests (JUnit @Tag("api")) against the running app.
 # mutaspec stops the 'start' process after 'run'.
@@ -24,3 +25,4 @@ ready = "curl -sf http://localhost:{port}/actuator/health"
 ready_timeout = "60s"
 run = "mvn -q test -Dgroups=api -DbaseUrl=http://localhost:{port}"
 timeout = "300s"
+junit = "**/target/surefire-reports/TEST-*.xml"  # per-test results
