@@ -18,6 +18,7 @@ Give a team one number they can trust for "how good are our tests at catching bu
    - It makes Rule Mutants with text rules (`<` to `<=`, `&&` to `||`, `+` to `-`, `true` to `false`, ...) and picks `--max` of them, the same ones each time.
    - For each Mutant it runs `build`, then the Suites from the fastest to the slowest, and stops at the first that catches it.
    - It prints the Mutation Score and each Survived Mutant as a diff, and writes `.mutaspec/runs/report.md`.
+   - With `--per-level`, it runs every Suite on every Mutant and gives a score per Level (spec 0004).
 
 `mutaspec baseline` runs only the first step, to set up the Suites.
 
@@ -45,7 +46,6 @@ Ordered by what users are likely to ask for first. Each item becomes a short spe
 
 | Next | What the user gets |
 |---|---|
-| Per-Level scores | Run every Suite on every Mutant (a flag), and see that, for example, unit tests catch 80% and API tests 20%. |
 | Better Rule Mutants | Fewer Mutants that do not build; more operators (removed calls, return values); one Mutant per line. |
 | Saved Mutant Set and Rounds | Keep the Mutants in the repository, run them again after test changes, and compare two runs. |
 | Faster runs | Only the code changed on a branch; a time budget; several worktrees at once. |
