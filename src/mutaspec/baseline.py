@@ -68,8 +68,10 @@ def seconds(value: float) -> str:
 class _SuiteRun:
     """FR3: setup once, then each repeat, then teardown (always)."""
 
-    def __init__(self, suite: Suite, cwd: Path, logs: Path, root: Path):
+    def __init__(self, suite: Suite, cwd: Path, logs: Path, root: Path, judge: bool = True):
         self.suite, self.cwd, self.logs, self.root = suite, cwd, logs, root
+        self.judge = judge  # False for a Mutant run: failures are the point there
+        self.timed_out = False
         self.result = SuiteResult(suite.name, suite.level)
         self.codes: list[int] = []
         self.last_log: Path | None = None
@@ -89,7 +91,8 @@ class _SuiteRun:
                 self._setup()
                 for n in range(1, self.suite.repeat + 1):
                     self._repeat(n)
-                self._judge()
+                if self.judge:
+                    self._judge()
             finally:
                 with process.no_interrupts():
                     self._teardown()
@@ -129,6 +132,7 @@ class _SuiteRun:
                 process.stop(service)  # AC11
             self.result.durations.append(time.monotonic() - started)
         if done.timed_out:
+            self.timed_out = True
             raise _Broken(f"took longer than {seconds(suite.timeout or 0)}", log)
         code = done.code or 0
         self.codes.append(code)
@@ -240,8 +244,21 @@ def _text(data: dict, results: list[SuiteResult], base: worktree.Base) -> list[s
     return lines
 
 
-def run(config: Config, include_uncommitted: bool) -> dict:
-    """Run every Suite on the Baseline; write and return the Baseline result (FR1-FR9)."""
+@dataclass
+class Checked:
+    base: worktree.Base
+    results: list[SuiteResult]
+    data: dict  # what baseline.json holds
+    lines: list[str]
+    warnings: list[str]
+
+    @property
+    def ready(self) -> bool:
+        return self.data["ready"]
+
+
+def check(config: Config, include_uncommitted: bool) -> Checked:
+    """Run every Suite on the Baseline and write baseline.json (FR1-FR9)."""
     root = config.root.resolve()
     worktree.own_folder(root / RUNS)
     (root / RESULT_FILE).unlink(missing_ok=True)  # D40
@@ -264,9 +281,15 @@ def run(config: Config, include_uncommitted: bool) -> dict:
         "suites": [r.to_json() for r in results],
     }
     (root / RESULT_FILE).write_text(json.dumps(data, indent=2) + "\n")
+    return Checked(base, results, data, _text(data, results, base), warnings)
+
+
+def run(config: Config, include_uncommitted: bool) -> dict:
+    """`mutaspec baseline`: the Baseline result for people and for --json."""
+    checked = check(config, include_uncommitted)
     return {
-        **data,
-        "lines": _text(data, results, base),
-        "warnings": warnings,
-        "exit_code": OK if ready else ENVIRONMENT,
+        **checked.data,
+        "lines": checked.lines,
+        "warnings": checked.warnings,
+        "exit_code": OK if checked.ready else ENVIRONMENT,
     }

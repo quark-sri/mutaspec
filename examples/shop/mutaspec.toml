@@ -1,10 +1,9 @@
-# Written by 'mutaspec init'. Check it, then run 'mutaspec config check'.
+# Written by 'mutaspec init'. Check it, then run 'mutaspec run'.
 
 [project]
 baseline = "HEAD"  # git ref of the clean code
 source = ["src/main/java/**"]  # files Mutants may change
 tests = ["src/test/java/**"]  # files Mutants never change
-spec = ["docs/**/*.md", "src/main/resources/openapi.yaml"]  # requirement documents
 build = "mvn -q -DskipTests test-compile"  # fails -> Mutant is Invalid
 
 [[suites]]

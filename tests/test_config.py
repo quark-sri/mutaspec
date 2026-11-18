@@ -219,7 +219,6 @@ def test_source_and_test_files_are_split_per_file(git_repo):
         ('run = "mvn -q test"', "run = 3"),  # wrong type
         ('source = ["src/main/java/**"]', "source = 3"),  # globs wrong type
         ('timeout = "5m"', "repeat = 0"),
-        ('timeout = "5m"', 'parallel = "yes"'),
         ('timeout = "5m"', 'timeout = "five"'),
         ("[project]", "[project"),  # not TOML
     ],

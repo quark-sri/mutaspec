@@ -157,3 +157,18 @@ def test_edge_mutaspec_folder_is_never_listed_as_uncommitted(git_repo):
     base = worktree.create_base(load(root), include_uncommitted=False)
 
     assert base.left_out == []
+
+
+def test_edge_project_folder_not_committed_is_a_usage_error(git_repo):
+    root = git_repo / "new"
+    write(root, "mutaspec.toml", CONFIG.format(ref="HEAD"))
+    write(root, "src/app.txt", "v1\n")
+
+    with pytest.raises(MutaspecError) as caught:
+        worktree.create_base(load(root), include_uncommitted=False)
+
+    assert caught.value.exit_code == USAGE
+    assert "not in the baseline commit" in caught.value.message
+    assert "--include-uncommitted" in caught.value.hint
+    base = worktree.create_base(load(root), include_uncommitted=True)
+    assert (base.project_dir / "src" / "app.txt").read_text() == "v1\n"

@@ -11,11 +11,12 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"></a>
-  <a href="docs/PLAN.md"><img alt="Status: design" src="https://img.shields.io/badge/status-design-orange.svg"></a>
+  <a href="docs/PLAN.md"><img alt="Status: v0.1 preview" src="https://img.shields.io/badge/status-v0.1%20preview-orange.svg"></a>
   <a href="https://agentskills.io"><img alt="Agent Skills" src="https://img.shields.io/badge/Agent%20Skills-Claude%20Code%20%7C%20Codex-8B5CF6"></a>
 </p>
 
 <p align="center">
+  <a href="#quickstart">Quickstart</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#status-and-roadmap">Status</a> ·
   <a href="#documentation">Documentation</a> ·
@@ -24,7 +25,7 @@
 
 ---
 
-> **Status: design.** You cannot install mutaspec yet. This repository holds the plan, the decisions and the specifications. See [Status and roadmap](#status-and-roadmap).
+> **Status: v0.1 preview.** `mutaspec run` gives a real Mutation Score today, with Rule Mutants. Suggestions from an AI agent and the other features are on the [roadmap](#status-and-roadmap).
 
 ## About
 
@@ -46,6 +47,55 @@ mutaspec calls each planted bug a **Mutant**. The [glossary](GLOSSARY.md) define
 - your tests are not only unit tests, but also integration, API or UI tests
 - you want concrete advice on which tests to add, not only a score
 
+## Quickstart
+
+You need git, Python 3.13 or newer, and [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv tool install git+https://github.com/quark-sri/mutaspec
+cd your-project          # a git repository whose tests pass
+mutaspec init            # writes mutaspec.toml; check it and fill it in
+mutaspec run --max 20    # plant 20 bugs, run your tests on each, print the score
+```
+
+Try it first on the Python example in this repository. It needs nothing but Python:
+
+```text
+$ cd examples/calc && mutaspec run
+...
+Score: 60.0% (3 of 5 Mutants caught; 2 survived, 0 invalid)
+Survived (no test caught these):
+  src/calc/__init__.py:17  >= -> >
+    - if subtotal >= FREE_SHIPPING_FROM:
+    + if subtotal > FREE_SHIPPING_FROM:
+```
+
+No test checks a subtotal of exactly 50, so the bug survives. Add that test and run again.
+
+A minimal `mutaspec.toml` for any language:
+
+```toml
+[project]
+source = ["src/**/*.py"]   # files mutaspec may change
+tests = ["tests/**"]       # files mutaspec never changes
+
+[[suites]]
+name = "unit"
+level = "unit"
+run = "python3 -m unittest discover -s tests -q"   # any test command
+```
+
+A Suite can also start a service before its tests and stop it after them (`setup`, `start`, `ready`, `teardown`), which lets API and UI tests count. [examples/shop](examples/shop/mutaspec.toml) shows this for a Spring Boot app.
+
+| Command | What it does |
+|---|---|
+| `mutaspec init` | Writes a draft `mutaspec.toml`. Detects Maven and Spring Boot. |
+| `mutaspec run [--max N]` | Checks the clean code, then runs the Mutants and prints the score. Default: 20 Mutants. |
+| `mutaspec baseline` | Only checks that each Suite passes on the clean code. Use it while you set up the Suites. |
+| `mutaspec config check` | Checks `mutaspec.toml`. |
+
+Every command takes `--json` for scripts and agents. The full report is in `.mutaspec/runs/report.md`.
+
 ## How it works
 
 ```text
@@ -62,54 +112,50 @@ mutaspec calls each planted bug a **Mutant**. The [glossary](GLOSSARY.md) define
 |---|---|
 | **Configure** | You give the source folders and one test command (a Suite) for each test level. |
 | **Baseline** | mutaspec runs each Suite on the clean code more than one time. All tests must pass. Flaky or failing tests are set aside and reported. |
-| **Inject** | mutaspec makes the Mutant Set one time. Each Mutant is a git patch that changes source files only. |
+| **Inject** | mutaspec makes the Mutants. Each Mutant is a small change to one line of a source file, never of a test file. |
 | **Run** | For each Mutant, mutaspec applies the patch in a separate git worktree and runs the Suites. The cheapest Suite runs first. |
 | **Score** | Each Mutant is Killed or Survived. mutaspec gives the Mutation Score for each level and for all levels. |
 | **Suggest** | An AI agent reads each Survived Mutant. It tells you what is not tested and at which level to test it, and it gives a sketch of the check. |
 | **Improve** | You write the tests. mutaspec does not write tests for you. |
 | **Next round** | mutaspec runs the same Mutant Set against your new tests and shows what changed. |
 
+Today mutaspec does the steps from Configure to Score, with Rule Mutants. Suggest, Agent Mutants and Next round are on the roadmap.
+
 ## Key ideas
 
 - **Your tests, any language.** A Suite is a shell command. Any test tool works. API and UI tests count too.
 - **Your working tree stays safe.** mutaspec runs everything in git worktrees under `.mutaspec/worktrees/`. It never changes your files ([ADR 0001](docs/adr/0001-mutants-are-patches-run-in-worktrees.md)).
 - **Two kinds of Mutants.** Rule Mutants come from simple changes, for example `<` to `<=` or `&&` to `||`. Agent Mutants are realistic bugs that a coding agent writes from the code and its specification.
-- **The same Mutants in each round.** mutaspec saves the Mutant Set and uses it again. A change in the score comes from a change in the tests, not from different bugs.
+- **The same Mutants in each round.** For the same code, mutaspec picks the same Mutants each time. A change in the score comes from a change in the tests, not from different bugs.
 - **People write the tests.** The agent only suggests ([ADR 0002](docs/adr/0002-agent-suggests-tests-user-writes-them.md)). Only a person can mark a Mutant as Equivalent.
 - **Fair scores.** A failure of a flaky test, or of a test that failed before, does not count as a kill.
 - **Works with any agent.** The core is a command-line tool and files. Skills and plugins for Claude Code and other coding agents only hold instructions.
 
 ## Status and roadmap
 
-mutaspec is in the design stage. Each feature goes through an intent, a specification and a plan before anyone writes code ([process](docs/process.md)).
+**v0.1 preview (now):** `init`, `run` and `baseline`; Rule Mutants for most languages; one overall score; Survived Mutants as diffs; Suites that start services for API tests.
 
-| Milestone | Result |
-|---|---|
-| **v0.1 walking skeleton** | A real score for the unit and API Suites of an example Spring Boot project. |
-| **v0.2 the improvement loop** | Agent Mutants, suggestions, rounds, comparison, and a Claude Code skill and plugin. |
-| **v0.3 scale and teams** | Runs on the changed code only, a CI gate, a self-evaluation benchmark and more languages. |
-
-Java and Spring Boot come first. Python and TypeScript follow. The full plan and its risks are in [docs/PLAN.md](docs/PLAN.md).
+**Next**, in order: per-Level scores, better Rule Mutants, a saved Mutant Set and Rounds, faster runs, Suggestions from an AI agent, Agent Mutants, skills for coding agents, a CI gate. Details: [roadmap](docs/PLAN.md#roadmap).
 
 ## Documentation
 
 | Document | Content |
 |---|---|
-| [Plan](docs/PLAN.md) | Goal, users, workflow, architecture, roadmap and risks |
-| [Process](docs/process.md) | How each feature goes from intent to code |
+| [Plan](docs/PLAN.md) | Goal, users, what works today, architecture, roadmap and risks |
+| [Process](docs/process.md) | How each feature goes from spec to code |
 | [Research](docs/research.md) | Existing tools and what mutaspec learns from them |
 | [Decision ledger](docs/decisions.md) | Every decision taken with the owner, with the reason |
 | [Decisions](docs/adr/) | Architecture decision records |
-| [Intents](intent/) | One folder for each planned feature |
+| [Intents](intent/) | One folder for each feature |
 | [Glossary](GLOSSARY.md) | The terms that mutaspec uses |
 
 ## Contributing
 
-Contributions are welcome, also in the design stage. Comments on the plan and the specifications are useful now.
+Contributions are welcome. The most useful thing now: run mutaspec on your project and tell us what went wrong or what you missed.
 
 1. Read the [process](docs/process.md) and the [glossary](GLOSSARY.md).
 2. For a new idea or a problem, [open an issue](https://github.com/quark-sri/mutaspec/issues).
-3. Each feature starts as an intent in `intent/NNNN-name/`. Do not write code for a feature before its specification is approved.
+3. Each feature starts as a short spec in `intent/NNNN-name/spec.md`, then tests, then code.
 4. Use the terms of the glossary in code, documents and commit messages.
 
 Instructions for AI coding agents are in [AGENTS.md](AGENTS.md).

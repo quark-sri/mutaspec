@@ -1,42 +1,34 @@
 # How we build mutaspec
 
-We follow Anthropic's [AI-native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) (Aug 2026): each stage ends by committing a document the next stage reads. Where the playbook gives no template (spec.md), we use [GitHub spec-kit](https://github.com/github/spec-kit)'s structure.
+Small steps that people can use. Each step has one short spec, one branch and one pull request.
 
 ```
- Plan            Design             Build                         Test / Review           Merge
- intent.md  ──►  spec.md  ──────►  plan.md ──► tests ──► code ──► verifier + checks ──►  PR ──► owner merges
-   ▲ owner         ▲ owner          ▲ engineer approves           ▲ fresh context
-   approves        approves         in plan mode                  reports only
+ spec.md  ──►  tests  ──►  code  ──►  checks + demo  ──►  PR  ──►  owner merges
+  owner OKs     test first             (verifier for bigger features)
 ```
 
-## Stage 1 — Plan: intent.md
-- Agent **interviews** you, one question at a time, then writes `intent/NNNN-name/intent.md` with: Problem, Proposed outcome, Affected users and systems, Constraints, Open questions.
-- No solutions, libraries or acceptance criteria here. If the problem names a technology, restate it as a symptom.
-- Gate: you edit and approve (`Status: approved`), commit. Git history is the audit trail.
+## 1. Spec
+- Write `intent/NNNN-name/spec.md` from [the template](../intent/_templates/spec.md): why, what the user sees, acceptance criteria (AC1…), out of scope. One page at most.
+- The owner says yes (in the chat or by merging). For a small change, the PR description is enough.
 
-Prompt: *"Read AGENTS.md and intent/0000-mutaspec/intent.md. Interview me one short question at a time about <feature>, then write intent/NNNN-<name>/intent.md from intent/_templates/intent.md. Show it to me before committing."*
+## 2. Build
+- Work on a new branch from the newest `main`.
+- Test first: each acceptance criterion gets a test named `test_acN_...`. If a test fails, fix the code, not the test.
+- Commit in small steps. Checks before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
+- If the spec turns out wrong, change the spec in the same PR and say so.
 
-## Stage 2 — Design: spec.md
-- From the approved intent **and the real code**, the agent writes `spec.md`: user scenarios with priorities, Given/When/Then acceptance criteria (AC1…), edge cases, functional requirements (FR1…), key entities, measurable success criteria, out of scope.
-- Unknowns are marked `[NEEDS CLARIFICATION: …]`. A spec with open items is not approved.
-- Gate: you review, resolve open items, approve, commit `spec.md` next to `intent.md`.
+## 3. Check
+- Run the demos: `mutaspec run` in `examples/calc` (Python, seconds) and in `examples/shop` (Java and Maven, about a minute). `git status` must stay clean.
+- For a bigger feature, run the `verifier` subagent in a fresh context. It reports and does not fix.
 
-## Stage 3 — Build: plan.md, tests, code
-- Fresh session, plan mode, branch `intent/NNNN-name`. The agent writes `plan.md`: **Files that change, Order of work, Risks, Proof** (the tests that show each AC). You approve before any edit.
-- Work the "Order of work" list: one step, one commit, test first (`test_acN_...` fails → code → passes). Never edit a test to make it pass; fix the code.
-- If the work departs from the plan, update `plan.md` in the same commit. If the spec is wrong, stop and fix the spec first.
-- Checks before each commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`.
-
-## Stage 4 — Test and review
-- Run the `verifier` subagent (`.claude/agents/verifier.md`) in a fresh context: it runs the demo on `examples/shop` and checks every AC in `spec.md`. It reports; it does not fix.
-- Review before the PR when the change adds behaviour, a file format, or agent-facing text.
-- Changes to skills or AGENTS.md: run the skill evals before merge.
-
-## Stage 5 — Merge
+## 4. Merge
 - PR description: what changes for users and why. The owner merges. Tags and releases need the owner.
 
+## Decisions
+- Decisions taken with the owner, and decisions that are hard to reverse, get a row in [decisions.md](decisions.md) in the same commit.
+- Architecture decisions go in [docs/adr/](adr/).
+
 ## Habits
-- One feature folder per branch and PR. Start each stage in a fresh session (`/clear`).
-- Build v0.1 thin first (0001–0004) so a real score comes out of `examples/shop` early, then deepen.
-- Every problem found later (bug, bad suggestion, slow run) becomes a new intent or an eval.
-- Every decision taken with the owner gets a row in [decisions.md](decisions.md), in the same commit as the document it changes.
+- Ship the smallest thing people can use, then improve it from what they report.
+- Do not build for a future feature. A config key, a file or a flag comes with the feature that reads it.
+- Every problem found later (bug, slow run, bad Mutant) becomes a test or a roadmap item.

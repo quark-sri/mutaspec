@@ -1,0 +1,11 @@
+# A Python project with no dependencies. Try: cd examples/calc && mutaspec run
+
+[project]
+source = ["src/**/*.py"]  # files Mutants may change
+tests = ["tests/**"]  # files Mutants never change
+
+[[suites]]
+name = "unit"
+level = "unit"
+run = "python3 -m unittest discover -s tests -q"
+timeout = "60s"

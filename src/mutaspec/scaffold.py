@@ -3,18 +3,15 @@
 import json
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
-from mutaspec import gitrepo
 from mutaspec.config import CONFIG_FILE
 from mutaspec.errors import USAGE, MutaspecError
 
 STATE_DIR = ".mutaspec"
 
-# Temporary files are ignored; the Mutant Set (mutants/) and history stay committable (AC6).
 STATE_GITIGNORE = """\
 # Written by mutaspec init. Temporary files only.
-# The Mutant Set (mutants/) and history.jsonl are meant to be committed.
 worktrees/
 runs/
 """
@@ -28,7 +25,6 @@ class Project:
     mvn: str = "mvn"
     web: bool = False  # Spring Boot web app: gets an api Suite
     actuator: bool = False  # has /actuator/health
-    spec: tuple[str, ...] = ()  # requirement documents
     modules: tuple[str, ...] = ()  # Maven modules of a parent pom
 
 
@@ -66,30 +62,6 @@ def _artifacts(pom: ET.Element) -> set[str]:
     return found
 
 
-_BUILD_OUTPUT = {"target", "build", "node_modules", ".mutaspec"}
-_CONTRACT_SUFFIXES = {".yaml", ".yml", ".json"}
-
-
-def spec_globs(files: list[str]) -> list[str]:
-    """Requirement documents in common places: docs/ and OpenAPI/Swagger files (spec FR7)."""
-    docs = [f for f in files if f.startswith("docs/")]
-    found = []
-    if any(f.endswith(".md") for f in docs):
-        found.append("docs/**/*.md")
-    elif docs:
-        found.append("docs/**")
-    contracts = []
-    for f in files:
-        path = PurePosixPath(f)
-        if _BUILD_OUTPUT & set(path.parts) or path.suffix not in _CONTRACT_SUFFIXES:
-            continue
-        named = path.stem in ("openapi", "swagger")
-        in_folder = path.parent.name == "openapi"
-        if named or in_folder:
-            contracts.append(f)
-    return found + sorted(contracts)
-
-
 def _modules(pom: ET.Element) -> list[str]:
     """Module folders listed in a parent pom's <modules>."""
     return [
@@ -103,9 +75,8 @@ def _modules(pom: ET.Element) -> list[str]:
 
 def detect(root: Path) -> Project:
     pom = _pom(root)
-    spec = tuple(spec_globs(gitrepo.list_files(root)))
     if pom is None:
-        return Project(kind="unknown", spec=spec)
+        return Project(kind="unknown")
     modules = tuple(_modules(pom))
     artifacts = _artifacts(pom)
     for module in modules:
@@ -114,7 +85,6 @@ def detect(root: Path) -> Project:
             artifacts |= _artifacts(module_pom)
     return Project(
         kind="maven",
-        spec=spec,
         mvn="./mvnw" if (root / "mvnw").is_file() else "mvn",
         web="spring-boot-starter-web" in artifacts,
         actuator="spring-boot-starter-actuator" in artifacts,
@@ -150,13 +120,7 @@ def _commented(lines: list[str]) -> list[str]:
     return [f"# {line}" if line else "#" for line in lines]
 
 
-def _spec_line(project: Project) -> str:
-    if project.spec:
-        return f"spec = {_toml(list(project.spec))}  # requirement documents"
-    return '# spec = ["docs/**/*.md"]  # requirement documents (none found)'
-
-
-HEADER = "# Written by 'mutaspec init'. Check it, then run 'mutaspec config check'."
+HEADER = "# Written by 'mutaspec init'. Check it, then run 'mutaspec run'."
 
 
 def _render_maven(project: Project) -> str:
@@ -171,7 +135,6 @@ def _render_maven(project: Project) -> str:
         'baseline = "HEAD"  # git ref of the clean code',
         f"source = {_toml(source)}  # files Mutants may change",
         f"tests = {_toml(tests)}  # files Mutants never change",
-        _spec_line(project),
         f"build = {_toml(f'{mvn} -q -DskipTests test-compile')}  # fails -> Mutant is Invalid",
         "",
         "[[suites]]",
@@ -204,7 +167,6 @@ def _render_unknown(project: Project) -> str:
         'baseline = "HEAD"  # git ref of the clean code',
         'source = ["src/**"]  # files Mutants may change',
         'tests = ["tests/**"]  # files Mutants never change',
-        _spec_line(project).removeprefix("# "),
         'build = "make build"  # fails -> Mutant is Invalid',
         "",
         "[[suites]]",
@@ -231,7 +193,7 @@ def _message(project: Project) -> str:
     if project.kind != "maven":
         return (
             f"Project type not detected yet; wrote a commented {CONFIG_FILE} template. "
-            "Fill it in, then run 'mutaspec config check'."
+            "Fill it in, then run 'mutaspec run'."
         )
     if project.web and project.modules:
         kind = "a multi-module Maven project; review the commented api Suite"
@@ -239,7 +201,7 @@ def _message(project: Project) -> str:
         kind = "a Maven project with a Spring Boot web app (unit and api Suites)"
     else:
         kind = "a Maven project"
-    return f"Wrote {CONFIG_FILE} for {kind}. Check it, then run 'mutaspec config check'."
+    return f"Wrote {CONFIG_FILE} for {kind}. Check it, then run 'mutaspec run'."
 
 
 def init(root: Path, force: bool) -> dict:
