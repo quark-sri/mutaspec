@@ -1,7 +1,8 @@
 """`mutaspec run`: check the Baseline, then run the Suites on each Rule Mutant and score them.
 
 For each Mutant: write it into the Baseline worktree, run `build` (if set), run the Suites
-from the fastest to the slowest until one catches it, and put the code back.
+from the fastest to the slowest until one catches it (or all of them with `--per-level`),
+and put the code back.
 """
 
 import shutil
@@ -32,6 +33,7 @@ class Outcome:
     tests: list[str] = field(default_factory=list)  # tests that failed on it (with junit)
     reason: str | None = None  # why it is Invalid
     seconds: float = 0.0
+    suites: dict[str, str] = field(default_factory=dict)  # the result of each Suite that ran
 
     def to_json(self) -> dict:
         return {
@@ -41,6 +43,7 @@ class Outcome:
             "tests": self.tests,
             "reason": self.reason,
             "seconds": round(self.seconds, 3),
+            "suites": self.suites,
             "diff": self.mutant.diff(),
         }
 
@@ -73,7 +76,11 @@ def _try_suite(
 
 
 def _run_mutant(
-    mutant: mutants.Mutant, config: Config, checked: baseline.Checked, root: Path
+    mutant: mutants.Mutant,
+    config: Config,
+    checked: baseline.Checked,
+    root: Path,
+    per_level: bool = False,
 ) -> Outcome:
     started = time.monotonic()
     cwd = checked.base.project_dir
@@ -99,10 +106,19 @@ def _run_mutant(
                 outcome.reason = f"build failed (log: {log.relative_to(root)})"
         for suite, before in order if outcome.status == SURVIVED else []:
             status, tests, reason = _try_suite(suite, before, cwd, logs, root)
-            if status != SURVIVED:
-                outcome.status, outcome.tests, outcome.reason = status, tests, reason
-                outcome.suite = suite.name if status != INVALID else None
+            outcome.suites[suite.name] = status
+            outcome.tests += tests
+            if status in (KILLED, TIMEOUT) and outcome.suite is None:
+                outcome.suite = suite.name
+                outcome.status = status
+            if status == INVALID and outcome.reason is None:
+                outcome.reason = reason
+            if status != SURVIVED and not per_level:
                 break
+        if outcome.suite is None and outcome.reason is not None:
+            outcome.status = INVALID  # no Suite caught it, and one broke
+        elif outcome.suite is not None:
+            outcome.reason = None
     finally:
         with process.no_interrupts():
             mutants.restore(mutant, cwd, original)
@@ -116,6 +132,30 @@ def score(outcomes: list[Outcome]) -> dict:
     scored = caught + count[SURVIVED]
     percent = round(100 * caught / scored, 1) if scored else None
     return {"score": percent, "caught": caught, "scored": scored, **count}
+
+
+def level_scores(outcomes: list[Outcome], config: Config) -> dict[str, dict]:
+    """Spec 0004 AC2: per Level, the Mutants caught by a Suite of that Level, out of those
+    where every Suite of that Level gave a result."""
+    levels: dict[str, list[str]] = {}
+    for suite in config.suites:
+        levels.setdefault(suite.level, []).append(suite.name)
+    scores = {}
+    for level, names in levels.items():
+        caught = scored = 0
+        for o in outcomes:
+            results = [o.suites.get(name) for name in names]
+            if o.status == INVALID or any(r in (None, INVALID) for r in results):
+                continue
+            scored += 1
+            caught += any(r in (KILLED, TIMEOUT) for r in results)
+        percent = round(100 * caught / scored, 1) if scored else None
+        scores[level] = {"score": percent, "caught": caught, "scored": scored}
+    return scores
+
+
+def _percent(value: float | None) -> str:
+    return "none" if value is None else f"{value}%"
 
 
 def _where(m: mutants.Mutant) -> str:
@@ -139,7 +179,14 @@ def _summary(s: dict) -> str:
     )
 
 
-def _report(checked: baseline.Checked, outcomes: list[Outcome], s: dict, found: int) -> str:
+def _report(
+    checked: baseline.Checked,
+    outcomes: list[Outcome],
+    s: dict,
+    found: int,
+    levels: dict[str, dict] | None,
+    config: Config,
+) -> str:
     data = checked.data
     out = [
         "# mutaspec report",
@@ -153,6 +200,10 @@ def _report(checked: baseline.Checked, outcomes: list[Outcome], s: dict, found: 
         "Killed and timeout count as caught. Invalid Mutants (they did not build, or a",
         "Suite broke for another reason) are not scored.",
     ]
+    if levels is not None:
+        out += ["", "## Per Level", "", "| Level | Score | Caught | Scored |", "|---|---|---|---|"]
+        for level, v in levels.items():
+            out.append(f"| {level} | {_percent(v['score'])} | {v['caught']} | {v['scored']} |")
     survived = [o for o in outcomes if o.status == SURVIVED]
     if survived:
         out += ["", "## Survived: no test caught these bugs", ""]
@@ -162,7 +213,11 @@ def _report(checked: baseline.Checked, outcomes: list[Outcome], s: dict, found: 
     out += ["", "## All Mutants", "", "| Mutant | Where | Change | Result | Detail |"]
     out += ["|---|---|---|---|---|"]
     for o in outcomes:
-        detail = o.reason or ", ".join([o.suite or "", *o.tests[:3]]).strip(", ")
+        if levels is not None:
+            ran = [s.name for s in config.suites if s.name in o.suites]
+            detail = ", ".join(f"{name}: {o.suites[name]}" for name in ran)
+        else:
+            detail = o.reason or ", ".join([o.suite or "", *o.tests[:3]]).strip(", ")
         out.append(
             f"| `{o.mutant.id}` | {_where(o.mutant)} | `{o.mutant.rule}` | {o.status} | "
             f"{detail.replace('|', '/')} |"
@@ -175,6 +230,7 @@ def run(
     include_uncommitted: bool,
     max_mutants: int = DEFAULT_MAX,
     say: Callable[[str], None] = lambda _: None,
+    per_level: bool = False,
 ) -> dict:
     root = config.root.resolve()
     checked = baseline.check(config, include_uncommitted)
@@ -197,12 +253,21 @@ def run(
 
     outcomes = []
     for n, mutant in enumerate(chosen, start=1):
-        outcomes.append(_run_mutant(mutant, config, checked, root))
+        outcomes.append(_run_mutant(mutant, config, checked, root, per_level))
         say(_line(n, len(chosen), outcomes[-1]))
 
     s = score(outcomes)
-    (root / REPORT).write_text(_report(checked, outcomes, s, len(found)))
+    levels = level_scores(outcomes, config) if per_level else None
+    (root / REPORT).write_text(_report(checked, outcomes, s, len(found), levels, config))
     lines = ["", _summary(s)]
+    if levels is not None:
+        lines.append("Per Level:")
+        for level, v in levels.items():
+            lines.append(f"  {level:<12} {_percent(v['score'])}  ({v['caught']} of {v['scored']})")
+    elif len({suite.level for suite in config.suites}) > 1:
+        lines.append(
+            "For a score per Level, run with --per-level (runs every Suite on every Mutant)."
+        )
     survived = [o for o in outcomes if o.status == SURVIVED]
     if survived:
         lines.append("Survived (no test caught these):")
@@ -215,6 +280,7 @@ def run(
         "ready": True,
         "baseline": checked.data,
         **s,
+        **({"levels": levels} if levels is not None else {}),
         "found": len(found),
         "mutants": [o.to_json() for o in outcomes],
         "report": str(REPORT),

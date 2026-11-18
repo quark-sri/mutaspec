@@ -4,7 +4,7 @@ Plants bugs in a git worktree, runs the project's own test suites against the cl
 
 ## Commands
 - Checks before every commit: `uv run ruff check . && uv run ruff format --check . && uv run pytest`
-- Demos: in `examples/calc`, `uv run mutaspec run` (Python only, seconds; must score 60%). In `examples/shop`, `uv run mutaspec init --force && uv run mutaspec run --max 10` (needs Java and Maven, about a minute). `git status` must stay clean (the committed `examples/shop/mutaspec.toml` is the golden output of `init`).
+- Demos: in `examples/calc`, `uv run mutaspec run` (Python only, seconds; must score 60%). In `examples/shop`, `uv run mutaspec init --force && uv run mutaspec run --max 10` (needs Java and Maven, about a minute; with `--per-level`, about 2.5 minutes and unit 70%, api 10%). `git status` must stay clean (the committed `examples/shop/mutaspec.toml` is the golden output of `init`).
 
 ## Conventions
 - Work follows [docs/process.md](docs/process.md): a short `intent/NNNN-name/spec.md` the owner says yes to, then tests, then code. Build the smallest thing people can use; no config keys, files or flags for future features.

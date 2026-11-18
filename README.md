@@ -91,6 +91,7 @@ A Suite can also start a service before its tests and stop it after them (`setup
 |---|---|
 | `mutaspec init` | Writes a draft `mutaspec.toml`. Detects Maven and Spring Boot. |
 | `mutaspec run [--max N]` | Checks the clean code, then runs the Mutants and prints the score. Default: 20 Mutants. |
+| `mutaspec run --per-level` | Runs every Suite on every Mutant and gives a score per Level, for example unit 70% and api 10%. Slower. |
 | `mutaspec baseline` | Only checks that each Suite passes on the clean code. Use it while you set up the Suites. |
 | `mutaspec config check` | Checks `mutaspec.toml`. |
 
@@ -119,7 +120,7 @@ Every command takes `--json` for scripts and agents. The full report is in `.mut
 | **Improve** | You write the tests. mutaspec does not write tests for you. |
 | **Next round** | mutaspec runs the same Mutant Set against your new tests and shows what changed. |
 
-Today mutaspec does the steps from Configure to Score, with Rule Mutants. Suggest, Agent Mutants and Next round are on the roadmap.
+Today mutaspec does the steps from Configure to Score (overall and per Level), with Rule Mutants. Suggest, Agent Mutants and Next round are on the roadmap.
 
 ## Key ideas
 
@@ -133,9 +134,9 @@ Today mutaspec does the steps from Configure to Score, with Rule Mutants. Sugges
 
 ## Status and roadmap
 
-**v0.1 preview (now):** `init`, `run` and `baseline`; Rule Mutants for most languages; one overall score; Survived Mutants as diffs; Suites that start services for API tests.
+**v0.1 preview (now):** `init`, `run` and `baseline`; Rule Mutants for most languages; an overall score and a score per Level; Survived Mutants as diffs; Suites that start services for API tests.
 
-**Next**, in order: per-Level scores, better Rule Mutants, a saved Mutant Set and Rounds, faster runs, Suggestions from an AI agent, Agent Mutants, skills for coding agents, a CI gate. Details: [roadmap](docs/PLAN.md#roadmap).
+**Next**, in order: better Rule Mutants, a saved Mutant Set and Rounds, faster runs, Suggestions from an AI agent, Agent Mutants, skills for coding agents, a CI gate. Details: [roadmap](docs/PLAN.md#roadmap).
 
 ## Documentation
 

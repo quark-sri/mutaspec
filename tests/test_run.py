@@ -46,6 +46,20 @@ class CalcTest(unittest.TestCase):
         self.assertEqual(calc.countdown(3), 0)
 """
 
+# A second Level: checks the age boundary only.
+IT_TESTS = """\
+import sys
+import unittest
+
+sys.path.insert(0, "src")
+import calc  # noqa: E402
+
+
+class CalcIT(unittest.TestCase):
+    def test_adult_at_18(self):
+        self.assertTrue(calc.is_adult(18))
+"""
+
 UNITTEST = shlex.join([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-q"])
 
 
@@ -58,14 +72,15 @@ def fast_waits(monkeypatch):
 
 @pytest.fixture
 def calc_repo(git_repo):
-    def _make(project: str = "", run: str = UNITTEST):
+    def _make(project: str = "", run: str = UNITTEST, more_suites: str = ""):
         write(git_repo, "src/calc.py", CALC)
         write(git_repo, "tests/test_calc.py", TESTS)
+        write(git_repo, "tests/it_calc.py", IT_TESTS)
         write(
             git_repo,
             "mutaspec.toml",
             f'[project]\nsource = ["src/**"]\ntests = ["tests/**"]\n{project}\n\n'
-            f'[[suites]]\nname = "unit"\nlevel = "unit"\nrun = {json.dumps(run)}\n',
+            f'[[suites]]\nname = "unit"\nlevel = "unit"\nrun = {json.dumps(run)}\n' + more_suites,
         )
         commit_all(git_repo)
         return git_repo
@@ -197,3 +212,76 @@ def test_ac1_python_never_runs_stale_bytecode_of_the_baseline(git_repo, run_cli)
     for _ in range(3):
         data = run_cli(git_repo, "run", "--json").json()
         assert [m["status"] for m in data["mutants"]] == ["killed"]
+
+
+# Per-Level scores (spec 0004)
+
+IT_RUN = shlex.join(
+    [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "it_*.py", "-q"]
+)
+IT_SUITE = f'\n[[suites]]\nname = "it"\nlevel = "integration"\nrun = {json.dumps(IT_RUN)}\n'
+
+
+def test_spec4_ac1_ac2_ac3_every_suite_runs_and_each_level_gets_a_score(calc_repo, run_cli):
+    root = calc_repo(more_suites=IT_SUITE)
+
+    data = run_cli(root, "run", "--per-level", "--json").json()
+
+    suites = {f"{m['line']} {m['rule']}": m["suites"] for m in data["mutants"]}
+    assert suites == {
+        "2 >= -> >": {"unit": "survived", "it": "killed"},
+        "6 + -> -": {"unit": "killed", "it": "survived"},
+        "10 > -> >=": {"unit": "killed", "it": "survived"},
+        "11 - -> +": {"unit": "timeout", "it": "survived"},
+    }
+    assert data["score"] == 100.0
+    assert data["levels"] == {
+        "unit": {"score": 75.0, "caught": 3, "scored": 4},
+        "integration": {"score": 25.0, "caught": 1, "scored": 4},
+    }
+
+
+def test_spec4_ac2_a_suite_that_breaks_leaves_the_mutant_out_of_its_level(calc_repo, run_cli):
+    # On the "+" Mutant only, the setup of "it" fails: the Suite breaks.
+    broken_it = IT_SUITE + "setup = \"! grep -q 'a - b' src/calc.py\"\n"
+    root = calc_repo(more_suites=broken_it)
+
+    data = run_cli(root, "run", "--per-level", "--json").json()
+
+    plus = next(m for m in data["mutants"] if m["rule"] == "+ -> -")
+    assert plus["suites"]["it"] == "invalid"
+    assert plus["status"] == "killed"  # unit caught it
+    assert data["levels"]["integration"] == {"score": 33.3, "caught": 1, "scored": 3}
+    assert data["levels"]["unit"]["scored"] == 4
+
+
+def test_spec4_ac4_without_the_flag_the_first_catch_stops_and_the_flag_is_named(calc_repo, run_cli):
+    root = calc_repo(more_suites=IT_SUITE)
+
+    out = run_cli(root, "run")
+    data = run_cli(root, "run", "--json").json()
+
+    assert "--per-level" in out.out
+    assert "levels" not in data
+    plus = next(m for m in data["mutants"] if m["rule"] == "+ -> -")
+    # Suites run fastest first; nothing runs after the first that catches it.
+    assert list(plus["suites"].values())[-1] == "killed"
+    assert set(list(plus["suites"].values())[:-1]) <= {"survived"}
+    assert plus["suites"]["unit"] == "killed"
+
+
+def test_spec4_ac4_one_level_gets_no_hint(calc_repo, run_cli):
+    assert "--per-level" not in run_cli(calc_repo(), "run").out
+
+
+def test_spec4_ac5_text_and_report_show_each_level(calc_repo, run_cli):
+    root = calc_repo(more_suites=IT_SUITE)
+
+    out = run_cli(root, "run", "--per-level")
+
+    assert "Per Level:" in out.out
+    assert "unit         75.0%  (3 of 4)" in out.out
+    assert "integration  25.0%  (1 of 4)" in out.out
+    report = (root / runner.REPORT).read_text()
+    assert "| integration | 25.0% | 1 | 4 |" in report
+    assert "unit: survived, it: killed" in report
