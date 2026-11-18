@@ -61,6 +61,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also use uncommitted changes and new files (baseline must be HEAD)",
     )
+    run.add_argument(
+        "--per-level",
+        action="store_true",
+        help="run every Suite on every Mutant and give a score per Level (slower)",
+    )
     run.add_argument("--json", action="store_true", help="print one JSON object on stdout")
     run.set_defaults(handler=_run)
     return parser
@@ -86,7 +91,13 @@ def _run(root: Path, args: argparse.Namespace) -> Output:
     if args.max < 1:
         raise MutaspecError(USAGE, "--max must be 1 or more.", hint="Example: --max 20.")
     say = (lambda _: None) if args.json else (lambda line: print(line, flush=True))
-    return runner.run(load(root), args.include_uncommitted, max_mutants=args.max, say=say)
+    return runner.run(
+        load(root),
+        args.include_uncommitted,
+        max_mutants=args.max,
+        say=say,
+        per_level=args.per_level,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
